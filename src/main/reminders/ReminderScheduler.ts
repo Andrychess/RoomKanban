@@ -1,5 +1,5 @@
 import { Notification } from 'electron'
-import { addDaysIso, todayIso } from '../../shared/dates'
+import { addDaysIso, dueDateOnly, todayIso } from '../../shared/dates'
 import type { Room, Task } from '../../shared/types'
 import { isActiveTask } from '../../shared/tasks'
 import type { BoardSyncManager } from '../sync/BoardSyncManager'
@@ -65,7 +65,7 @@ export class ReminderScheduler {
       const assignee = room.state.employees[task.assignee_pc]
       const assigneeName = assignee?.name ?? 'Сотрудник'
 
-      if (task.due_date === today) {
+      if (dueDateOnly(task.due_date) === today) {
         const key = this.reminderKey(task.id, task.due_date, 'due_today')
         if (!(await this.wasSent(roomPath, key))) {
           if (settings.notify_assignee && task.assignee_pc === room.pcId) {
@@ -83,7 +83,9 @@ export class ReminderScheduler {
 
       for (const days of settings.days_before) {
         if (days <= 0) continue
-        const remindOn = addDaysIso(task.due_date, -days)
+        const dueDay = dueDateOnly(task.due_date)
+        if (!dueDay) continue
+        const remindOn = addDaysIso(dueDay, -days)
         if (remindOn !== today) continue
         const key = this.reminderKey(task.id, task.due_date, `before_${days}`)
         if (await this.wasSent(roomPath, key)) continue

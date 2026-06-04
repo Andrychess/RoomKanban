@@ -21,9 +21,11 @@ import type {
   UpdateTaskInput
 } from '../shared/types'
 import type { TaskStatus } from '../shared/taskStatus'
+import type { DocumentationBundle } from '../shared/documentation'
 import type { RoomSyncEvent, UpdateTaskResult } from '../shared/syncEvents'
 
 export interface RoomKanbanApi {
+  getUserDocumentation: () => Promise<DocumentationBundle>
   getAppTheme: () => Promise<AppTheme>
   setAppTheme: (theme: AppTheme) => Promise<AppTheme>
   selectFolder: () => Promise<string | null>
@@ -71,11 +73,13 @@ export interface RoomKanbanApi {
   updateTask: (input: UpdateTaskInput) => Promise<UpdateTaskResult>
   refreshRoomSync: () => Promise<{ refreshed_at: number }>
   onRoomSyncUpdated: (callback: (event: RoomSyncEvent) => void) => () => void
+  onRoomDataRefreshed: (callback: () => void) => () => void
   updateTaskStatus: (taskId: string, status: Task['status']) => Promise<void>
   clearDoneTasks: () => Promise<number>
   archiveDoneTasks: () => Promise<number>
   getArchivedTasks: () => Promise<Task[]>
   restoreArchivedTask: (taskId: string) => Promise<Task>
+  deleteArchivedTask: (taskId: string) => Promise<void>
   getTaskHistory: (taskId: string) => Promise<TaskHistoryEntry[]>
   addTaskComment: (taskId: string, text: string) => Promise<Task>
   getChiefDashboard: () => Promise<ChiefDashboardData>
@@ -97,11 +101,13 @@ export interface RoomKanbanApi {
   openExchangeFile: (employeeKey: string, fileId: string) => Promise<void>
   subscribeExchange: (callback: (files: Record<string, TaskFile[]>) => void) => () => void
   onNavigate: (callback: (screen: string) => void) => () => void
+  onOpenHelp: (callback: (anchor: string | null) => void) => () => void
   onRoomAutoOpened: (callback: (room: Room) => void) => () => void
   onRoomClosed: (callback: () => void) => () => void
 }
 
 const api: RoomKanbanApi = {
+  getUserDocumentation: () => ipcRenderer.invoke('get-user-documentation'),
   getAppTheme: () => ipcRenderer.invoke('get-app-theme'),
   setAppTheme: (theme) => ipcRenderer.invoke('set-app-theme', theme),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
@@ -162,12 +168,18 @@ const api: RoomKanbanApi = {
     ipcRenderer.on('room-sync-updated', handler)
     return () => ipcRenderer.removeListener('room-sync-updated', handler)
   },
+  onRoomDataRefreshed: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('room-data-refreshed', handler)
+    return () => ipcRenderer.removeListener('room-data-refreshed', handler)
+  },
   updateTaskStatus: (taskId, status) =>
     ipcRenderer.invoke('update-task-status', taskId, status),
   clearDoneTasks: () => ipcRenderer.invoke('clear-done-tasks'),
   archiveDoneTasks: () => ipcRenderer.invoke('archive-done-tasks'),
   getArchivedTasks: () => ipcRenderer.invoke('get-archived-tasks'),
   restoreArchivedTask: (taskId) => ipcRenderer.invoke('restore-archived-task', taskId),
+  deleteArchivedTask: (taskId) => ipcRenderer.invoke('delete-archived-task', taskId),
   getTaskHistory: (taskId) => ipcRenderer.invoke('get-task-history', taskId),
   addTaskComment: (taskId, text) => ipcRenderer.invoke('add-task-comment', taskId, text),
   getChiefDashboard: () => ipcRenderer.invoke('get-chief-dashboard'),
@@ -211,6 +223,11 @@ const api: RoomKanbanApi = {
     const handler = (_: unknown, screen: string) => callback(screen)
     ipcRenderer.on('navigate', handler)
     return () => ipcRenderer.removeListener('navigate', handler)
+  },
+  onOpenHelp: (callback) => {
+    const handler = (_: unknown, anchor: string | null) => callback(anchor)
+    ipcRenderer.on('open-help', handler)
+    return () => ipcRenderer.removeListener('open-help', handler)
   },
   onRoomAutoOpened: (callback) => {
     const handler = (_: unknown, room: Room) => callback(room)

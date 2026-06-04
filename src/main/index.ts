@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Menu, shell } from 'electron'
+import { app, BrowserWindow, Menu, nativeImage, shell } from 'electron'
 import { join } from 'path'
+import { resolveAppIconPath } from './appIcon'
 import { SettingsStore } from './settings/SettingsStore'
 import { RoomManager } from './room/RoomManager'
 import { autoOpenRoom, closeRoomFully, registerHandlers } from './ipc/registerHandlers'
@@ -12,6 +13,9 @@ const roomManager = new RoomManager(settings)
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
+  const iconPath = resolveAppIconPath()
+  const icon = iconPath ? nativeImage.createFromPath(iconPath) : undefined
+
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 720,
@@ -19,6 +23,8 @@ function createWindow(): void {
     minHeight: 500,
     show: false,
     autoHideMenuBar: false,
+    icon: icon && !icon.isEmpty() ? icon : undefined,
+    title: 'RoomKanban',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -68,6 +74,16 @@ function buildMenu(): void {
       ]
     },
     {
+      label: 'Справка',
+      submenu: [
+        {
+          label: 'Документация…',
+          accelerator: 'F1',
+          click: () => mainWindow?.webContents.send('open-help', null)
+        }
+      ]
+    },
+    {
       label: 'Вид',
       submenu: [
         {
@@ -113,6 +129,10 @@ function buildMenu(): void {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('ru.roomkanban.app')
+  }
+
   await settings.load()
   registerHandlers(roomManager, settings)
   buildMenu()

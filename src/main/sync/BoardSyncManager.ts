@@ -2,6 +2,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { shell } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
+import { normalizeDueDateStorage } from '../../shared/dates'
 import { parseTaskStatus } from '../../shared/taskStatus'
 import { DEFAULT_TYPE_ID } from '../../shared/defaultTaskTypes'
 import { DEFAULT_PRIORITY_ID } from '../../shared/defaultTaskPriorities'
@@ -15,6 +16,7 @@ import {
   syncTaskFilePath,
   syncTasksDir
 } from './syncPaths'
+import { assertTaskId, resolvePathInsideRoom } from './syncPathSecurity'
 import type {
   BoardData,
   ChecklistItem,
@@ -172,9 +174,11 @@ export class BoardSyncManager {
     })
   }
 
-  stop(): void {
-    void this.watcher?.close()
-    this.watcher = null
+  async stop(): Promise<void> {
+    if (this.watcher) {
+      await this.watcher.close()
+      this.watcher = null
+    }
     this.listeners.clear()
     this.taskCache.clear()
   }
@@ -297,7 +301,8 @@ export class BoardSyncManager {
       type_id: this.taskTypes.resolveTypeId(raw.type_id as string | undefined),
       priority_id: this.taskPriorities.resolvePriorityId(raw.priority_id as string | undefined),
       assignee_pc: String(raw.assignee_pc ?? this.pcId),
-      due_date: typeof due === 'string' && due.length > 0 ? due : null,
+      due_date:
+        typeof due === 'string' && due.length > 0 ? normalizeDueDateStorage(due.trim()) : null,
       source_files,
       completed_files,
       comments: parseComments(raw.comments),
@@ -344,6 +349,7 @@ export class BoardSyncManager {
   }
 
   private async readTaskFromDisk(taskId: string): Promise<Task | null> {
+    assertTaskId(taskId)
     const filePath = syncTaskFilePath(this.roomPath, taskId)
     const { data, ok } = await readJsonFile<Record<string, unknown>>(filePath, {})
     if (!ok || !data.id) return null
@@ -369,13 +375,20 @@ export class BoardSyncManager {
   }
 
   private async refreshOneTask(taskId: string, fromExternal: boolean): Promise<void> {
-    const task = await this.readTaskFromDisk(taskId)
-    if (task) this.taskCache.set(taskId, task)
-    else this.taskCache.delete(taskId)
-    this.emitActiveFromCache()
-    if (fromExternal) {
-      this.externalSync.notifyExternal(false)
-    }
+    if (!/^task_[a-z0-9]+\.json$/.test(`${taskId}.json`)) return
+    await this.mutex.run(async () => {
+      try {
+        const task = await this.readTaskFromDisk(taskId)
+        if (task) this.taskCache.set(taskId, task)
+        else this.taskCache.delete(taskId)
+      } catch {
+        /* invalid id or corrupt file */
+      }
+      this.emitActiveFromCache()
+      if (fromExternal) {
+        this.externalSync.notifyExternal(false)
+      }
+    })
   }
 
   private async loadAndEmit(fromExternal = false): Promise<void> {
@@ -394,6 +407,7 @@ export class BoardSyncManager {
    * Записывает одну задачу. При более новой версии на диске сохраняет её (merge) и возвращает true.
    */
   private async persistTask(task: Task, opts?: { force?: boolean }): Promise<boolean> {
+    assertTaskId(task.id)
     const filePath = syncTaskFilePath(this.roomPath, task.id)
     let mergedFromRemote = false
     let toWrite = task
@@ -413,6 +427,7 @@ export class BoardSyncManager {
   }
 
   private async deleteTaskFile(taskId: string): Promise<void> {
+    assertTaskId(taskId)
     try {
       await fs.unlink(syncTaskFilePath(this.roomPath, taskId))
     } catch {
@@ -489,7 +504,7 @@ export class BoardSyncManager {
   }
 
   private async deleteFileEntry(file: TaskFile): Promise<void> {
-    const full = path.join(this.roomPath, file.file_rel.replace(/\//g, path.sep))
+    const full = resolvePathInsideRoom(this.roomPath, file.file_rel)
     try {
       await fs.unlink(full)
     } catch {
@@ -558,7 +573,7 @@ export class BoardSyncManager {
         type_id: this.taskTypes.resolveTypeId(input.type_id),
         priority_id: this.taskPriorities.resolvePriorityId(input.priority_id),
         assignee_pc: input.assignee_pc,
-        due_date: input.due_date?.trim() || null,
+        due_date: normalizeDueDateStorage(input.due_date ?? null),
         source_files,
         completed_files,
         comments: [],
@@ -598,7 +613,7 @@ export class BoardSyncManager {
         assignee_pc: input.assignee_pc,
         type_id: this.taskTypes.resolveTypeId(input.type_id),
         priority_id: this.taskPriorities.resolvePriorityId(input.priority_id),
-        due_date: input.due_date?.trim() || null,
+        due_date: normalizeDueDateStorage(input.due_date ?? null),
         status: input.status,
         checklist: input.checklist ?? prev.checklist,
         updated_at: Math.floor(Date.now() / 1000)
@@ -695,6 +710,30 @@ export class BoardSyncManager {
     })
   }
 
+  async deleteArchivedTask(taskId: string): Promise<void> {
+    return this.withBoardMutation(async (tasks) => {
+      const task = tasks.find((t) => t.id === taskId)
+      if (!task) throw new Error('Задача не найдена')
+      if (!task.archived_at) {
+        throw new Error('Удалять можно только задачи из архива')
+      }
+
+      for (const file of task.source_files) {
+        await this.deleteFileEntry(file)
+      }
+      for (const file of task.completed_files) {
+        await this.deleteFileEntry(file)
+      }
+      await this.removeAllTaskDocs(task.id)
+      await this.deleteTaskFile(task.id)
+      if (this.history) {
+        await this.history.deleteForTask(taskId)
+      }
+      this.emitActiveFromCache()
+      this.externalSync.notifyExternal(false)
+    })
+  }
+
   /** @deprecated используйте archiveDoneTasks */
   async clearTasksByStatus(status: Task['status']): Promise<number> {
     if (status === 'done') return this.archiveDoneTasks()
@@ -771,7 +810,7 @@ export class BoardSyncManager {
     const file = files.find((f) => f.id === fileId)
     if (!file) throw new Error('Файл не найден')
 
-    const full = path.join(this.roomPath, file.file_rel.replace(/\//g, path.sep))
+    const full = resolvePathInsideRoom(this.roomPath, file.file_rel)
     await shell.openPath(full)
   }
 }

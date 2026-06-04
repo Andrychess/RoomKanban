@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { TaskTemplate } from '../../shared/types'
+import { useRoomDataRefresh } from './useRoomDataRefresh'
 
 export function useTaskTemplates() {
   const [templates, setTemplates] = useState<TaskTemplate[]>([])
 
-  useEffect(() => {
-    void window.api.getTaskTemplates().then(setTemplates)
-    return window.api.subscribeTaskTemplates(setTemplates)
+  const refresh = useCallback(() => {
+    void window.api.getTaskTemplates().then(setTemplates).catch(() => setTemplates([]))
   }, [])
 
-  return { templates, refresh: () => void window.api.getTaskTemplates().then(setTemplates) }
+  useEffect(() => {
+    refresh()
+    return window.api.subscribeTaskTemplates(setTemplates)
+  }, [refresh])
+
+  useRoomDataRefresh(refresh, true)
+
+  return { templates, refresh }
 }

@@ -4,6 +4,11 @@ export const TASK_STATUSES = ['review', 'todo', 'in_progress', 'done'] as const
 
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
+/** Задача завершена (колонка «Готово») — не считается просроченной. */
+export function isDoneStatus(status: TaskStatus | string): boolean {
+  return status === 'done'
+}
+
 /** Подписи для колонок и выбора статуса */
 export const STATUS_LABELS: Record<TaskStatus, string> = {
   review: 'Входящие',

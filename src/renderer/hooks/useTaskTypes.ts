@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { TaskType } from '../../shared/types'
+import { useRoomDataRefresh } from './useRoomDataRefresh'
 
 export function useTaskTypes() {
   const [types, setTypes] = useState<TaskType[]>([])
 
-  useEffect(() => {
-    void window.api.getTaskTypes().then(setTypes)
-    return window.api.subscribeTaskTypes(setTypes)
+  const refresh = useCallback(() => {
+    void window.api.getTaskTypes().then(setTypes).catch(() => setTypes([]))
   }, [])
 
-  return { types, setTypes, refresh: () => void window.api.getTaskTypes().then(setTypes) }
+  useEffect(() => {
+    refresh()
+    return window.api.subscribeTaskTypes(setTypes)
+  }, [refresh])
+
+  useRoomDataRefresh(refresh, true)
+
+  return { types, setTypes, refresh }
 }

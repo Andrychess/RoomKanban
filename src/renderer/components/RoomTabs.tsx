@@ -1,4 +1,6 @@
 import type { Screen } from '../navigation/useNavHistory'
+import TooltipWrap from './TooltipWrap'
+import { UI_HINTS } from '../hints/uiHints'
 
 type RoomTabId = 'kanban' | 'calendar' | 'team' | 'exchange' | 'archive' | 'dashboard' | 'overdue'
 
@@ -30,14 +32,15 @@ export default function RoomTabs({ active, isChief, overdueCount = 0, onChange }
   return (
     <nav className="room-tabs" aria-label="Разделы">
       {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          className={`room-tab ${active === tab.id ? 'active' : ''} ${tab.id === 'overdue' && overdueCount > 0 ? 'has-alert' : ''}`}
-          onClick={() => onChange(tab.screen)}
-        >
-          {tab.label}
-        </button>
+        <TooltipWrap key={tab.id} text={UI_HINTS.tabs[tab.id]}>
+          <button
+            type="button"
+            className={`room-tab ${active === tab.id ? 'active' : ''} ${tab.id === 'overdue' && overdueCount > 0 ? 'has-alert' : ''}`}
+            onClick={() => onChange(tab.screen)}
+          >
+            {tab.label}
+          </button>
+        </TooltipWrap>
       ))}
     </nav>
   )

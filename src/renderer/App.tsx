@@ -15,6 +15,10 @@ import ChiefDashboardScreen from './screens/ChiefDashboardScreen'
 import ArchiveScreen from './screens/ArchiveScreen'
 import ExchangeScreen from './screens/ExchangeScreen'
 import ThemeToggle from './components/ThemeToggle'
+import TooltipWrap from './components/TooltipWrap'
+import { useHelp } from './context/HelpContext'
+import { USER_HELP_ANCHORS, type UserHelpAnchorId } from '../shared/helpAnchors'
+import { UI_HINTS } from './hints/uiHints'
 import SyncToast from './components/SyncToast'
 import { useAppTheme } from './hooks/useAppTheme'
 import { useSyncNotifications } from './hooks/useSyncNotifications'
@@ -34,6 +38,7 @@ const MENU_SCREEN_MAP: Record<string, Screen> = {
 }
 
 export default function App() {
+  const { openHelp } = useHelp()
   const { theme, toggleTheme } = useAppTheme()
   const { screen, navigate, back, canBack } = useNavHistory('welcome')
   const [room, setRoom] = useState<Room | null>(null)
@@ -50,7 +55,11 @@ export default function App() {
       screen === 'archive' ||
       screen === 'exchange')
 
-  const { tasks: roomTasks, refresh: refreshRoomTasks } = useRoomTasks(room?.path ?? '')
+  const {
+    tasks: roomTasks,
+    refresh: refreshRoomTasks,
+    loadError: roomTasksLoadError
+  } = useRoomTasks(room?.path ?? '')
   const overdueCount = useOverdueCount(roomTasks)
   const { toast: syncToast, dismissToast } = useSyncNotifications(inRoomView)
   const [syncRefreshing, setSyncRefreshing] = useState(false)
@@ -123,12 +132,17 @@ export default function App() {
       navigate('welcome', { reset: true })
     })
 
+    const unsubHelp = window.api.onOpenHelp((anchor) => {
+      openHelp((anchor as UserHelpAnchorId | null) ?? USER_HELP_ANCHORS.hints)
+    })
+
     return () => {
       unsubNav()
       unsubAuto()
       unsubClosed()
+      unsubHelp()
     }
-  }, [navigate])
+  }, [navigate, openHelp])
 
   return (
     <div className="app">
@@ -136,8 +150,19 @@ export default function App() {
       <header className="app-header">
         <div className="header-left">
           <div className="brand-row">
-            <h1>Задачи офиса</h1>
+            <h1 className="app-brand">
+              <img src="./icon.png" alt="" className="app-brand-icon" width={28} height={28} />
+              RoomKanban
+            </h1>
             <AppNav canBack={canBack && !inRoomView} onBack={back} />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm doc-help-btn"
+              onClick={() => openHelp(USER_HELP_ANCHORS.hints)}
+              title="Справка по приложению"
+            >
+              Справка
+            </button>
             <ThemeToggle theme={theme} onToggle={() => void toggleTheme()} />
           </div>
           {inRoomView && room && (
@@ -170,31 +195,33 @@ export default function App() {
                   )}
                 </div>
                 <div className="room-bar-actions">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    disabled={syncRefreshing}
-                    title="Перечитать файлы синхронизации в папке комнаты"
-                    onClick={() => {
-                      setSyncRefreshing(true)
-                      void window.api
-                        .refreshRoomSync()
-                        .then(() => refreshRoomTasks())
-                        .finally(() => setSyncRefreshing(false))
-                    }}
-                  >
-                    {syncRefreshing ? 'Обновление…' : 'Обновить синхронизацию'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={async () => {
-                      await window.api.closeRoom()
-                      goWelcome()
-                    }}
-                  >
-                    Другая комната
-                  </button>
+                  <TooltipWrap text={UI_HINTS.roomBar.sync}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={syncRefreshing}
+                      onClick={() => {
+                        setSyncRefreshing(true)
+                        void window.api
+                          .refreshRoomSync()
+                          .finally(() => setSyncRefreshing(false))
+                      }}
+                    >
+                      {syncRefreshing ? 'Обновление…' : 'Обновить синхронизацию'}
+                    </button>
+                  </TooltipWrap>
+                  <TooltipWrap text={UI_HINTS.roomBar.leave}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={async () => {
+                        await window.api.closeRoom()
+                        goWelcome()
+                      }}
+                    >
+                      Другая комната
+                    </button>
+                  </TooltipWrap>
                 </div>
               </div>
             </>
@@ -241,13 +268,18 @@ export default function App() {
         {screen === 'kanban' && room && (
           <KanbanScreen
             room={room}
+            tasks={roomTasks}
+            onTasksChange={refreshRoomTasks}
+            tasksLoadError={roomTasksLoadError}
             overdueCount={overdueCount}
             onOpenOverdue={
               room.isChief ? () => navigate('overdue', { replace: true }) : undefined
             }
           />
         )}
-        {screen === 'calendar' && room && <CalendarScreen room={room} />}
+        {screen === 'calendar' && room && (
+          <CalendarScreen room={room} tasks={roomTasks} onTasksChange={refreshRoomTasks} />
+        )}
         {screen === 'team' && room && (
           <TeamScreen room={room} onRoomUpdated={updateRoom} />
         )}

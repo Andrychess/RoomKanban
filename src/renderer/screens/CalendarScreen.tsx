@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react'
 import type { Room, Task } from '../../shared/types'
 import { STATUS_LABELS } from '../../shared/taskStatus'
-import TaskEditor from '../components/TaskEditor'
-import { useRoomTasks } from '../hooks/useRoomTasks'
+import TaskEditor, { type TaskEditorMode } from '../components/TaskEditor'
 import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 import { findTaskPriority, findTaskType } from '../utils/taskTypes'
+import { isTaskOverdue } from '../../shared/overdue'
+import TooltipWrap from '../components/TooltipWrap'
+import HintIcon from '../components/HintIcon'
+import { UI_HINTS } from '../hints/uiHints'
 import {
   buildMonthGrid,
-  isOverdue,
+  dueDateOnly,
   MONTH_LABELS,
   todayIso,
   WEEKDAY_LABELS
@@ -16,16 +19,18 @@ import {
 
 interface Props {
   room: Room
+  tasks: Task[]
+  onTasksChange: () => void
 }
 
-export default function CalendarScreen({ room }: Props) {
-  const { tasks, refresh } = useRoomTasks(room.path)
+export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
   const { types: taskTypes } = useTaskTypes()
   const { priorities: taskPriorities } = useTaskPriorities()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
   const [editorOpen, setEditorOpen] = useState(false)
+  const [editorMode, setEditorMode] = useState<TaskEditorMode>('create')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [createDueDate, setCreateDueDate] = useState<string | null>(null)
 
@@ -34,10 +39,11 @@ export default function CalendarScreen({ room }: Props) {
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>()
     for (const task of tasks) {
-      if (!task.due_date) continue
-      const list = map.get(task.due_date) ?? []
+      const day = dueDateOnly(task.due_date)
+      if (!day) continue
+      const list = map.get(day) ?? []
       list.push(task)
-      map.set(task.due_date, list)
+      map.set(day, list)
     }
     for (const list of map.values()) {
       list.sort((a, b) => a.title.localeCompare(b.title, 'ru'))
@@ -70,14 +76,16 @@ export default function CalendarScreen({ room }: Props) {
     setMonth(n.getMonth())
   }
 
-  function openEdit(task: Task) {
+  function openViewDetails(task: Task) {
     setEditingTask(task)
+    setEditorMode('view')
     setCreateDueDate(null)
     setEditorOpen(true)
   }
 
   function openCreate(iso: string) {
     setEditingTask(null)
+    setEditorMode('create')
     setCreateDueDate(iso)
     setEditorOpen(true)
   }
@@ -99,9 +107,11 @@ export default function CalendarScreen({ room }: Props) {
         <button type="button" className="btn" onClick={goToday}>
           Сегодня
         </button>
-        <button type="button" className="btn btn-primary" onClick={() => openCreate(todayIso())}>
-          + Задача на сегодня
-        </button>
+        <TooltipWrap text={UI_HINTS.calendar.addDay}>
+          <button type="button" className="btn btn-primary" onClick={() => openCreate(todayIso())}>
+            + Задача на сегодня
+          </button>
+        </TooltipWrap>
       </div>
 
       <div className="legends-row calendar-legend">
@@ -147,19 +157,21 @@ export default function CalendarScreen({ room }: Props) {
               <div className="calendar-cell-head">
                 <span className="calendar-day-num">{cell.day}</span>
                 {cell.isCurrentMonth && cell.iso && (
-                  <button
-                    type="button"
-                    className="btn-link calendar-add"
-                    onClick={() => openCreate(cell.iso!)}
-                    title="Добавить задачу"
-                  >
-                    +
-                  </button>
+                  <TooltipWrap text={UI_HINTS.calendar.addDay}>
+                    <button
+                      type="button"
+                      className="btn-link calendar-add"
+                      onClick={() => openCreate(cell.iso!)}
+                      aria-label="Добавить задачу"
+                    >
+                      +
+                    </button>
+                  </TooltipWrap>
                 )}
               </div>
               <ul className="calendar-task-list">
                 {dayTasks.map((task) => {
-                  const overdue = isOverdue(task.due_date, task.status)
+                  const overdue = isTaskOverdue(task)
                   const assignee = room.state.employees[task.assignee_pc]
                   const type = findTaskType(taskTypes, task.type_id)
                   const priority = findTaskPriority(taskPriorities, task.priority_id)
@@ -169,7 +181,7 @@ export default function CalendarScreen({ room }: Props) {
                         type="button"
                         className={`calendar-task ${overdue ? 'calendar-task-overdue' : ''} cal-status-${task.status}`}
                         style={type ? { borderLeftColor: type.color } : undefined}
-                        onClick={() => openEdit(task)}
+                        onClick={() => openViewDetails(task)}
                       >
                         <span className="calendar-task-tags">
                           {type && (
@@ -203,14 +215,17 @@ export default function CalendarScreen({ room }: Props) {
 
       {unscheduled.length > 0 && (
         <section className="calendar-unscheduled card">
-          <h3>Без срока ({unscheduled.length})</h3>
+          <h3>
+            Без срока ({unscheduled.length})
+            <HintIcon topic="calendar.noDue" />
+          </h3>
           <ul className="unscheduled-list">
             {unscheduled.map((task) => {
               const type = findTaskType(taskTypes, task.type_id)
               const priority = findTaskPriority(taskPriorities, task.priority_id)
               return (
                 <li key={task.id}>
-                  <button type="button" className="unscheduled-item" onClick={() => openEdit(task)}>
+                  <button type="button" className="unscheduled-item" onClick={() => openViewDetails(task)}>
                     <span className="unscheduled-tags">
                       {type && (
                         <span className="task-type-badge small" style={{ background: type.color }}>
@@ -246,7 +261,10 @@ export default function CalendarScreen({ room }: Props) {
             <i className={`legend-dot cal-legend-${id}`} /> {label}
           </span>
         ))}
-        <span className="legend-overdue">Просроченные выделены красным</span>
+        <span className="legend-overdue">
+          Просроченные выделены красным
+          <HintIcon topic="calendar.overdueLegend" />
+        </span>
       </section>
 
       {editorOpen && (
@@ -256,10 +274,11 @@ export default function CalendarScreen({ room }: Props) {
           taskTypes={taskTypes}
           taskPriorities={taskPriorities}
           task={editingTask}
+          mode={editorMode}
           defaultStatus="review"
           defaultDueDate={createDueDate}
           onClose={() => setEditorOpen(false)}
-          onSaved={refresh}
+          onSaved={onTasksChange}
         />
       )}
     </>

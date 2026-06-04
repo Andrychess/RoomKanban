@@ -60,9 +60,11 @@ export class TaskTypesStore {
     this.watcher.on('add', onExternal)
   }
 
-  stop(): void {
-    void this.watcher?.close()
-    this.watcher = null
+  async stop(): Promise<void> {
+    if (this.watcher) {
+      await this.watcher.close()
+      this.watcher = null
+    }
     this.listeners.clear()
   }
 

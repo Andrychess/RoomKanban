@@ -1,5 +1,6 @@
 import type { ColumnSortId } from '../../shared/columnSort'
 import { COLUMN_SORT_OPTIONS } from '../../shared/columnSort'
+import { HintLabel } from './HintIcon'
 
 interface Props {
   value: ColumnSortId
@@ -9,7 +10,9 @@ interface Props {
 export default function ColumnSortSelect({ value, onChange }: Props) {
   return (
     <label className="column-sort">
-      <span className="column-sort-label">Сортировка</span>
+      <HintLabel className="column-sort-label" topic="kanban.columnSort">
+        Сортировка
+      </HintLabel>
       <select
         className="column-sort-select"
         value={value}

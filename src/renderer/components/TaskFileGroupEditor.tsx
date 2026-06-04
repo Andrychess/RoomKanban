@@ -16,6 +16,10 @@ interface Props {
   onRemoveExisting: (fileId: string) => void
   onRemovePending: (path: string) => void
   onOpen?: (fileId: string) => void
+  /** Запретить добавление файлов */
+  disableAdd?: boolean
+  /** Запретить удаление уже сохранённых файлов */
+  disableRemoveExisting?: boolean
 }
 
 export default function TaskFileGroupEditor({
@@ -27,7 +31,9 @@ export default function TaskFileGroupEditor({
   onAdd,
   onRemoveExisting,
   onRemovePending,
-  onOpen
+  onOpen,
+  disableAdd = false,
+  disableRemoveExisting = false
 }: Props) {
   const visibleExisting = existing.filter((f) => !removedIds.includes(f.id))
 
@@ -54,13 +60,15 @@ export default function TaskFileGroupEditor({
                   Открыть
                 </button>
               )}
-              <button
-                type="button"
-                className="btn-link danger"
-                onClick={() => onRemoveExisting(file.id)}
-              >
-                Удалить
-              </button>
+              {!disableRemoveExisting && (
+                <button
+                  type="button"
+                  className="btn-link danger"
+                  onClick={() => onRemoveExisting(file.id)}
+                >
+                  Удалить
+                </button>
+              )}
             </span>
           </li>
         ))}
@@ -81,9 +89,11 @@ export default function TaskFileGroupEditor({
         ))}
       </ul>
 
-      <button type="button" className="btn" onClick={onAdd}>
-        + Добавить файл
-      </button>
+      {!disableAdd && (
+        <button type="button" className="btn" onClick={onAdd}>
+          + Добавить файл
+        </button>
+      )}
     </div>
   )
 }

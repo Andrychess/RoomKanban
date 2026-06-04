@@ -1,16 +1,19 @@
-import { isOverdue, todayIso, toIsoDateLocal } from '../../shared/dates'
+export {
+  addDaysIso,
+  daysOverdue,
+  dueDateOnly,
+  formatDueDate,
+  isOverdue,
+  mergeDueDateTime,
+  splitDueDateTime,
+  todayIso,
+  toIsoDateLocal
+} from '../../shared/dates'
 
-export { isOverdue, todayIso, toIsoDateLocal }
+import { toIsoDateLocal } from '../../shared/dates'
 
-export function formatDueDate(iso: string): string {  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  })
-}
-
-export interface CalendarCell {  iso: string | null
+export interface CalendarCell {
+  iso: string | null
   day: number | null
   isCurrentMonth: boolean
   isToday: boolean
@@ -22,7 +25,7 @@ export function buildMonthGrid(year: number, month: number): CalendarCell[] {
   const last = new Date(year, month + 1, 0)
   const startPad = (first.getDay() + 6) % 7
   const cells: CalendarCell[] = []
-  const today = todayIso()
+  const today = toIsoDateLocal(new Date())
 
   for (let i = 0; i < startPad; i++) {
     const d = new Date(year, month, 1 - (startPad - i))

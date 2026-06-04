@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReminderSettings } from '../../shared/types'
+import { HintLabel } from './HintIcon'
 
 export default function ReminderSettingsPanel() {
   const [settings, setSettings] = useState<ReminderSettings | null>(null)
@@ -49,7 +50,9 @@ export default function ReminderSettingsPanel() {
         Уведомления Windows на этом компьютере. Ответственный видит свои задачи, начальник — все.
       </p>
       <label className="form-group">
-        <span>Напомнить за (дней до срока, через запятую)</span>
+        <HintLabel topic="reminders.days">
+          Напомнить за (дней до срока, через запятую)
+        </HintLabel>
         <input value={daysInput} onChange={(e) => setDaysInput(e.target.value)} />
       </label>
       <label className="checkbox-row">
@@ -58,7 +61,7 @@ export default function ReminderSettingsPanel() {
           checked={settings.notify_assignee}
           onChange={(e) => setSettings({ ...settings, notify_assignee: e.target.checked })}
         />
-        Уведомлять ответственного
+        <HintLabel topic="reminders.assignee">Уведомлять ответственного</HintLabel>
       </label>
       <label className="checkbox-row">
         <input
@@ -66,7 +69,7 @@ export default function ReminderSettingsPanel() {
           checked={settings.notify_chief}
           onChange={(e) => setSettings({ ...settings, notify_chief: e.target.checked })}
         />
-        Уведомлять начальника
+        <HintLabel topic="reminders.chief">Уведомлять начальника</HintLabel>
       </label>
       <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void save()}>
         {loading ? 'Сохранение…' : 'Сохранить напоминания'}

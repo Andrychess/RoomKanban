@@ -3,6 +3,9 @@ import type { ChiefDashboardData } from '../../shared/chiefDashboard'
 import type { Room, Task } from '../../shared/types'
 import { STATUS_LABELS } from '../../shared/taskStatus'
 import ReminderSettingsPanel from '../components/ReminderSettingsPanel'
+import TooltipWrap from '../components/TooltipWrap'
+import HintIcon from '../components/HintIcon'
+import { UI_HINTS } from '../hints/uiHints'
 import TaskEditor from '../components/TaskEditor'
 import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
@@ -47,22 +50,33 @@ export default function ChiefDashboardScreen({ room, onOpenOverdue, onTasksChang
       {data && !loading && (
         <>
           <div className="dashboard-cards">
-            <button type="button" className="dashboard-card dashboard-card-alert" onClick={onOpenOverdue}>
-              <span className="dashboard-card-value">{data.overdue_count}</span>
-              <span className="dashboard-card-label">Просрочено</span>
-            </button>
+            <TooltipWrap text={UI_HINTS.dashboard.overdueCard}>
+              <button type="button" className="dashboard-card dashboard-card-alert" onClick={onOpenOverdue}>
+                <span className="dashboard-card-value">{data.overdue_count}</span>
+                <span className="dashboard-card-label">Просрочено</span>
+              </button>
+            </TooltipWrap>
             <div className="dashboard-card">
               <span className="dashboard-card-value">{data.without_due_count}</span>
-              <span className="dashboard-card-label">Без срока (не готово)</span>
+              <span className="dashboard-card-label">
+                Без срока (не готово)
+                <HintIcon topic="dashboard.noDue" />
+              </span>
             </div>
             <div className="dashboard-card">
               <span className="dashboard-card-value">{data.stuck_tasks.length}</span>
-              <span className="dashboard-card-label">В работе &gt; 7 дней</span>
+              <span className="dashboard-card-label">
+                В работе &gt; 7 дней
+                <HintIcon topic="dashboard.stuck" />
+              </span>
             </div>
           </div>
 
           <section className="dashboard-section">
-            <h3>Нагрузка по сотрудникам</h3>
+            <h3>
+              Нагрузка по сотрудникам
+              <HintIcon topic="dashboard.workload" />
+            </h3>
             <table className="dashboard-table">
               <thead>
                 <tr>

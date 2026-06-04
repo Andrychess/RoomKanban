@@ -59,7 +59,7 @@ export default function OverdueReportScreen({ room, onTasksChanged }: Props) {
         <ul className="overdue-list">
           {tasks.map((task) => {
             const assignee = room.state.employees[task.assignee_pc]
-            const days = task.due_date ? daysOverdue(task.due_date) : 0
+            const days = task.due_date ? daysOverdue(task.due_date, task.status) : 0
             return (
               <li key={task.id} className="overdue-row">
                 <div className="overdue-row-main">

@@ -1,4 +1,4 @@
-import { broadcastRoomSync } from './syncBroadcast'
+import { broadcastRoomDataRefresh, broadcastRoomSync } from './syncBroadcast'
 import type { BoardSyncManager } from './BoardSyncManager'
 import type { ExchangeStore } from './ExchangeStore'
 import type { TaskPrioritiesStore } from './TaskPrioritiesStore'
@@ -20,5 +20,6 @@ export async function refreshRoomSync(stores: {
   if (stores.taskTemplatesStore) jobs.push(stores.taskTemplatesStore.reload())
   await Promise.all(jobs)
   broadcastRoomSync({ source: 'all', manual: true })
+  broadcastRoomDataRefresh()
   return { refreshed_at: Date.now() }
 }

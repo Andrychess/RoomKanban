@@ -5,25 +5,35 @@ import { COLUMN_THEMES, KANBAN_COLUMNS } from '../../shared/taskStatus'
 import ColumnSortSelect from '../components/ColumnSortSelect'
 import ConfirmDialog from '../components/ConfirmDialog'
 import KanbanFilters from '../components/KanbanFilters'
+import TooltipWrap from '../components/TooltipWrap'
+import { UI_HINTS } from '../hints/uiHints'
 import { useKanbanColumnSort } from '../hooks/useKanbanColumnSort'
 import { useOverdueCount } from '../hooks/useOverdueCount'
 import TaskCard from '../components/TaskCard'
-import TaskEditor from '../components/TaskEditor'
+import TaskEditor, { type TaskEditorMode } from '../components/TaskEditor'
 import RoomLabelsSettings from '../components/RoomLabelsSettings'
 import TaskTemplatesSettings from '../components/TaskTemplatesSettings'
 import { useKanbanTaskFilters } from '../hooks/useKanbanTaskFilters'
-import { useRoomTasks } from '../hooks/useRoomTasks'
 import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
 interface Props {
   room: Room
+  tasks: Task[]
+  onTasksChange: () => void
   onOpenOverdue?: () => void
   overdueCount?: number
+  tasksLoadError?: string | null
 }
 
-export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: Props) {
-  const { tasks, refresh } = useRoomTasks(room.path)
+export default function KanbanScreen({
+  room,
+  tasks,
+  onTasksChange,
+  onOpenOverdue,
+  overdueCount = 0,
+  tasksLoadError = null
+}: Props) {
   const localOverdueCount = useOverdueCount(tasks)
   const overdue = overdueCount > 0 ? overdueCount : localOverdueCount
   const { types: taskTypes, refresh: refreshTypes } = useTaskTypes()
@@ -33,6 +43,7 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
   const { sorts, setColumnSort } = useKanbanColumnSort(room.path)
 
   const [editorOpen, setEditorOpen] = useState(false)
+  const [editorMode, setEditorMode] = useState<TaskEditorMode>('create')
   const [typesOpen, setTypesOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [defaultStatus, setDefaultStatus] = useState<Task['status']>('review')
@@ -48,12 +59,21 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
 
   function openCreate(status: Task['status']) {
     setEditingTask(null)
+    setEditorMode('create')
     setDefaultStatus(status)
+    setEditorOpen(true)
+  }
+
+  function openViewDetails(task: Task) {
+    setEditingTask(task)
+    setEditorMode('view')
+    setDefaultStatus(task.status)
     setEditorOpen(true)
   }
 
   function openEdit(task: Task) {
     setEditingTask(task)
+    setEditorMode('edit')
     setDefaultStatus(task.status)
     setEditorOpen(true)
   }
@@ -61,7 +81,11 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
   async function changeStatus(status: Task['status'], taskId: string) {
     const task = tasks.find((t) => t.id === taskId)
     if (!task || task.status === status) return
-    await window.api.updateTaskStatus(taskId, status)
+    try {
+      await window.api.updateTaskStatus(taskId, status)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось сменить этап')
+    }
   }
 
   function handleDragOverColumn(e: React.DragEvent, status: Task['status']) {
@@ -83,7 +107,7 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
     try {
       await window.api.archiveDoneTasks()
       setArchiveDoneOpen(false)
-      refresh()
+      onTasksChange()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Не удалось отправить в архив')
     } finally {
@@ -93,38 +117,48 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
 
   return (
     <>
+      {tasksLoadError && <div className="error banner-error">{tasksLoadError}</div>}
       <div className="kanban-toolbar">
-        <button
-          type="button"
-          className="btn btn-primary btn-lg"
-          onClick={() => openCreate('review')}
-        >
-          + Новая задача
-        </button>
-        {room.isChief && onOpenOverdue && (
+        <TooltipWrap text={UI_HINTS.kanban.newTask}>
           <button
             type="button"
-            className={`btn btn-ghost ${overdue > 0 ? 'btn-alert' : ''}`}
-            onClick={onOpenOverdue}
+            className="btn btn-primary btn-lg"
+            onClick={() => openCreate('review')}
           >
-            Просрочено{overdue > 0 ? ` (${overdue})` : ''}
+            + Новая задача
           </button>
+        </TooltipWrap>
+        {room.isChief && onOpenOverdue && (
+          <TooltipWrap text={UI_HINTS.kanban.overdue}>
+            <button
+              type="button"
+              className={`btn btn-ghost ${overdue > 0 ? 'btn-alert' : ''}`}
+              onClick={onOpenOverdue}
+            >
+              Просрочено{overdue > 0 ? ` (${overdue})` : ''}
+            </button>
+          </TooltipWrap>
         )}
         {room.isChief && (
-          <button type="button" className="btn btn-ghost" onClick={() => setTemplatesOpen(true)}>
-            Шаблоны
-          </button>
+          <TooltipWrap text={UI_HINTS.kanban.templates}>
+            <button type="button" className="btn btn-ghost" onClick={() => setTemplatesOpen(true)}>
+              Шаблоны
+            </button>
+          </TooltipWrap>
         )}
         {room.isChief && (
-          <button type="button" className="btn btn-ghost" onClick={() => setTypesOpen(true)}>
-            Настройка меток
-          </button>
+          <TooltipWrap text={UI_HINTS.kanban.labels}>
+            <button type="button" className="btn btn-ghost" onClick={() => setTypesOpen(true)}>
+              Настройка меток
+            </button>
+          </TooltipWrap>
         )}
-        <p className="kanban-hint">Перетащите карточку в другую колонку или выберите этап внизу карточки.</p>
+        <p className="kanban-hint">{UI_HINTS.kanban.dragHint}</p>
       </div>
 
       <KanbanFilters
         filters={filters}
+        employees={room.state.employees}
         taskTypes={taskTypes}
         taskPriorities={taskPriorities}
         hasActiveFilters={hasActiveFilters}
@@ -169,37 +203,40 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
               <header className="kanban-column-head">
                 <div className="kanban-column-head-top">
                   <h3>{col.title}</h3>
-                  <span
-                    className="column-count"
-                    title={
-                      hasActiveFilters ? `Показано ${columnTasks.length} из ${totalInColumn}` : undefined
+                  <TooltipWrap
+                    text={
+                      hasActiveFilters
+                        ? `${UI_HINTS.kanban.columnCount}: ${columnTasks.length} из ${totalInColumn}`
+                        : `${columnTasks.length} в колонке`
                     }
                   >
-                    {countLabel}
-                  </span>
-                  <button
-                    type="button"
-                    className="column-add"
-                    onClick={() => openCreate(col.id)}
-                    title="Добавить задачу"
-                    aria-label="Добавить задачу"
-                  >
-                    +
-                  </button>
+                    <span className="column-count">{countLabel}</span>
+                  </TooltipWrap>
+                  <TooltipWrap text={UI_HINTS.kanban.columnAdd}>
+                    <button
+                      type="button"
+                      className="column-add"
+                      onClick={() => openCreate(col.id)}
+                      aria-label="Добавить задачу"
+                    >
+                      +
+                    </button>
+                  </TooltipWrap>
                 </div>
                 <ColumnSortSelect
                   value={sorts[col.id]}
                   onChange={(sortId) => void setColumnSort(col.id, sortId)}
                 />
                 {col.id === 'done' && doneCount > 0 && (
-                  <button
-                    type="button"
-                    className="column-clear"
-                    title="Убрать выполненные в архив"
-                    onClick={() => setArchiveDoneOpen(true)}
-                  >
-                    В архив
-                  </button>
+                  <TooltipWrap text={UI_HINTS.kanban.columnArchive}>
+                    <button
+                      type="button"
+                      className="column-clear"
+                      onClick={() => setArchiveDoneOpen(true)}
+                    >
+                      В архив
+                    </button>
+                  </TooltipWrap>
                 )}
               </header>
 
@@ -219,6 +256,7 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
                     taskPriorities={taskPriorities}
                     assignee={room.state.employees[task.assignee_pc]}
                       columnAccent={theme.accent}
+                    onViewDetails={openViewDetails}
                     onEdit={openEdit}
                       onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
                     onStatusChange={(id, status) => void changeStatus(status, id)}
@@ -252,9 +290,10 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
           taskTypes={taskTypes}
           taskPriorities={taskPriorities}
           task={editingTask}
+          mode={editorMode}
           defaultStatus={defaultStatus}
           onClose={() => setEditorOpen(false)}
-          onSaved={refresh}
+          onSaved={onTasksChange}
         />
       )}
 
@@ -266,7 +305,7 @@ export default function KanbanScreen({ room, onOpenOverdue, overdueCount = 0 }: 
           onSaved={() => {
             refreshTypes()
             refreshPriorities()
-            refresh()
+            onTasksChange()
           }}
         />
       )}

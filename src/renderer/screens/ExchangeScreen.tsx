@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { Room } from '../../shared/types'
 import { profilesFromRoom } from '../../shared/employees'
 import ConfirmDialog from '../components/ConfirmDialog'
+import TooltipWrap from '../components/TooltipWrap'
+import { UI_HINTS } from '../hints/uiHints'
 import { useExchange } from '../hooks/useExchange'
 
 interface Props {
@@ -85,47 +87,54 @@ export default function ExchangeScreen({ room }: Props) {
                 {files.length === 0 && <li className="exchange-empty">Пока пусто</li>}
                 {files.map((file) => (
                   <li key={file.id}>
-                    <button
-                      type="button"
-                      className="exchange-file-link"
-                      onClick={() => void openFile(profile.key, file.id)}
-                    >
-                      {file.file_name}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-link"
-                      title="Убрать файл"
-                      onClick={() =>
-                        void window.api.removeExchangeFile(profile.key, file.id).catch((err) => {
-                          alert(err instanceof Error ? err.message : 'Ошибка')
-                        })
-                      }
-                    >
-                      ×
-                    </button>
+                    <TooltipWrap text={UI_HINTS.exchange.open}>
+                      <button
+                        type="button"
+                        className="exchange-file-link"
+                        onClick={() => void openFile(profile.key, file.id)}
+                      >
+                        {file.file_name}
+                      </button>
+                    </TooltipWrap>
+                    <TooltipWrap text={UI_HINTS.exchange.remove}>
+                      <button
+                        type="button"
+                        className="btn-link"
+                        onClick={() =>
+                          void window.api.removeExchangeFile(profile.key, file.id).catch((err) => {
+                            alert(err instanceof Error ? err.message : 'Ошибка')
+                          })
+                        }
+                      >
+                        ×
+                      </button>
+                    </TooltipWrap>
                   </li>
                 ))}
               </ul>
 
               <div className="exchange-panel-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={busyKey === profile.key}
-                  onClick={() => void addFiles(profile.key)}
-                >
-                  {busyKey === profile.key ? '…' : '+ Добавить файл'}
-                </button>
-                {files.length > 0 && (
+                <TooltipWrap text={UI_HINTS.exchange.add}>
                   <button
                     type="button"
-                    className="btn btn-ghost"
-                    disabled={clearing}
-                    onClick={() => setClearKey(profile.key)}
+                    className="btn btn-primary"
+                    disabled={busyKey === profile.key}
+                    onClick={() => void addFiles(profile.key)}
                   >
-                    Очистить
+                    {busyKey === profile.key ? '…' : '+ Добавить файл'}
                   </button>
+                </TooltipWrap>
+                {files.length > 0 && (
+                  <TooltipWrap text={UI_HINTS.exchange.clear}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={clearing}
+                      onClick={() => setClearKey(profile.key)}
+                    >
+                      Очистить
+                    </button>
+                  </TooltipWrap>
                 )}
               </div>
             </section>

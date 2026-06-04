@@ -1,9 +1,13 @@
-import { useState } from 'react'
-import type { TaskPriority, TaskType } from '../../shared/types'
+import { useMemo, useState } from 'react'
+import type { Employee, TaskPriority, TaskType } from '../../shared/types'
+import { HintLabel } from './HintIcon'
+import { UI_HINTS } from '../hints/uiHints'
 import type { KanbanTaskFilters, OwnershipFilter } from '../hooks/useKanbanTaskFilters'
+import TooltipWrap from './TooltipWrap'
 
 interface Props {
   filters: KanbanTaskFilters
+  employees: Record<string, Employee>
   taskTypes: TaskType[]
   taskPriorities: TaskPriority[]
   hasActiveFilters: boolean
@@ -19,6 +23,7 @@ const OWNERSHIP_OPTIONS: { value: OwnershipFilter; label: string }[] = [
 
 export default function KanbanFilters({
   filters,
+  employees,
   taskTypes,
   taskPriorities,
   hasActiveFilters,
@@ -27,24 +32,36 @@ export default function KanbanFilters({
 }: Props) {
   const [open, setOpen] = useState(hasActiveFilters)
 
+  const employeeOptions = useMemo(
+    () =>
+      Object.entries(employees)
+        .map(([pcId, emp]) => ({ pcId, name: emp.name, role: emp.role }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    [employees]
+  )
+
   return (
     <div className={`kanban-filters-wrap ${open ? 'is-open' : ''}`}>
-      <button
-        type="button"
-        className={`kanban-filters-toggle ${hasActiveFilters ? 'has-active' : ''}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        {hasActiveFilters ? 'Фильтр включён' : 'Показать фильтр'}
-        <span className="kanban-filters-chevron" aria-hidden>
-          {open ? '▲' : '▼'}
-        </span>
-      </button>
+      <TooltipWrap text={UI_HINTS.kanban.filterToggle}>
+        <button
+          type="button"
+          className={`kanban-filters-toggle ${hasActiveFilters ? 'has-active' : ''}`}
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
+          {hasActiveFilters ? 'Фильтр включён' : 'Показать фильтр'}
+          <span className="kanban-filters-chevron" aria-hidden>
+            {open ? '▲' : '▼'}
+          </span>
+        </button>
+      </TooltipWrap>
 
       {open && (
         <div className="kanban-filters" role="search" aria-label="Фильтр задач">
           <label className="kanban-filter kanban-filter-search">
-            <span className="kanban-filter-label">Поиск</span>
+            <HintLabel className="kanban-filter-label" topic="filters.search">
+              Поиск
+            </HintLabel>
             <input
               type="search"
               value={filters.query}
@@ -54,7 +71,9 @@ export default function KanbanFilters({
           </label>
 
           <label className="kanban-filter">
-            <span className="kanban-filter-label">Срочность</span>
+            <HintLabel className="kanban-filter-label" topic="filters.priority">
+              Срочность
+            </HintLabel>
             <select
               value={filters.priorityId}
               onChange={(e) => onChange({ ...filters, priorityId: e.target.value })}
@@ -69,7 +88,9 @@ export default function KanbanFilters({
           </label>
 
           <label className="kanban-filter">
-            <span className="kanban-filter-label">Вид задачи</span>
+            <HintLabel className="kanban-filter-label" topic="filters.type">
+              Вид задачи
+            </HintLabel>
             <select
               value={filters.typeId}
               onChange={(e) => onChange({ ...filters, typeId: e.target.value })}
@@ -84,25 +105,41 @@ export default function KanbanFilters({
           </label>
 
           <label className="kanban-filter">
-            <span className="kanban-filter-label">Кому назначено</span>
+            <HintLabel className="kanban-filter-label" topic="filters.ownership">
+              Кому назначено
+            </HintLabel>
             <select
               value={filters.ownership}
               onChange={(e) =>
                 onChange({ ...filters, ownership: e.target.value as OwnershipFilter })
               }
             >
-              {OWNERSHIP_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
+              <optgroup label="Общее">
+                {OWNERSHIP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </optgroup>
+              {employeeOptions.length > 0 && (
+                <optgroup label="Сотрудники">
+                  {employeeOptions.map((emp) => (
+                    <option key={emp.pcId} value={emp.pcId}>
+                      {emp.name}
+                      {emp.role ? ` · ${emp.role}` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
 
           {hasActiveFilters && (
-            <button type="button" className="btn btn-ghost" onClick={onReset}>
-              Сбросить
-            </button>
+            <TooltipWrap text={UI_HINTS.filters.reset}>
+              <button type="button" className="btn btn-ghost" onClick={onReset}>
+                Сбросить
+              </button>
+            </TooltipWrap>
           )}
         </div>
       )}

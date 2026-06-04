@@ -1,3 +1,5 @@
+import { parseDueDate } from './dates'
+import { isTaskOverdue } from './overdue'
 import type { Task, TaskPriority } from './types'
 import type { TaskStatus } from './taskStatus'
 
@@ -36,7 +38,8 @@ function priorityRank(priorityId: string, order: string[]): number {
 
 function dueSortKey(due: string | null, asc: boolean): number {
   if (!due) return asc ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER
-  const t = new Date(due + 'T12:00:00').getTime()
+  const parsed = parseDueDate(due)
+  const t = parsed?.getTime() ?? 0
   return asc ? t : -t
 }
 
@@ -55,6 +58,9 @@ export function sortTasksInColumn(
       case 'due_soon':
         return dueSortKey(a.due_date, true) - dueSortKey(b.due_date, true)
       case 'due_late': {
+        const aLate = isTaskOverdue(a) ? 0 : 1
+        const bLate = isTaskOverdue(b) ? 0 : 1
+        if (aLate !== bLate) return aLate - bLate
         const ka = dueSortKey(a.due_date, false)
         const kb = dueSortKey(b.due_date, false)
         if (ka !== kb) return ka - kb

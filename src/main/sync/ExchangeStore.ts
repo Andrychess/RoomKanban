@@ -11,6 +11,7 @@ import {
   syncExchangeDir,
   syncExchangeFilePath
 } from './syncPaths'
+import { assertEmployeeKey, resolvePathInsideRoom } from './syncPathSecurity'
 
 type ExchangeListener = (data: Record<string, TaskFile[]>) => void
 
@@ -160,14 +161,17 @@ export class ExchangeStore {
     })
   }
 
-  stop(): void {
-    void this.watcher?.close()
-    this.watcher = null
+  async stop(): Promise<void> {
+    if (this.watcher) {
+      await this.watcher.close()
+      this.watcher = null
+    }
     this.listeners.clear()
     this.cache = null
   }
 
   private async readEmployee(employeeKey: string): Promise<TaskFile[]> {
+    assertEmployeeKey(employeeKey)
     const filePath = syncExchangeFilePath(this.roomPath, employeeKey)
     const { data, ok } = await readJsonFile<EmployeeExchangeData>(filePath, {
       files: [],
@@ -178,6 +182,7 @@ export class ExchangeStore {
   }
 
   private async writeEmployee(employeeKey: string, files: TaskFile[]): Promise<void> {
+    assertEmployeeKey(employeeKey)
     const payload: EmployeeExchangeData = {
       files,
       updated_at: Math.floor(Date.now() / 1000)
@@ -273,7 +278,7 @@ export class ExchangeStore {
   }
 
   private async deleteFileEntry(file: TaskFile): Promise<void> {
-    const full = path.join(this.roomPath, file.file_rel.replace(/\//g, path.sep))
+    const full = resolvePathInsideRoom(this.roomPath, file.file_rel)
     try {
       await fs.unlink(full)
     } catch {
@@ -335,7 +340,7 @@ export class ExchangeStore {
     const list = await this.readEmployee(employeeKey)
     const file = list.find((f) => f.id === fileId)
     if (!file) throw new Error('Файл не найден')
-    const full = path.join(this.roomPath, file.file_rel.replace(/\//g, path.sep))
+    const full = resolvePathInsideRoom(this.roomPath, file.file_rel)
     await shell.openPath(full)
   }
 }

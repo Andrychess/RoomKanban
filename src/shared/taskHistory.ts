@@ -1,3 +1,4 @@
+import { formatDueDate } from './dates'
 import type { Task, TaskHistoryEntry } from './types'
 import { STATUS_LABELS } from './taskStatus'
 
@@ -41,7 +42,7 @@ export function buildHistoryEntries(
     entries.push({
       ...base,
       action: 'due_date_changed',
-      detail: `${prev.due_date ?? '—'} → ${next.due_date ?? '—'}`
+      detail: `${formatDueDate(prev.due_date)} → ${formatDueDate(next.due_date)}`
     })
   }
   if (prev.type_id !== next.type_id) {

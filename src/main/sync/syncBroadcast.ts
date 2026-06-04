@@ -8,3 +8,12 @@ export function broadcastRoomSync(event: RoomSyncEvent): void {
     }
   }
 }
+
+/** После ручного «Обновить синхронизацию» — перечитать справочники и обмен в UI. */
+export function broadcastRoomDataRefresh(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send('room-data-refreshed')
+    }
+  }
+}

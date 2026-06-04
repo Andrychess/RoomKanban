@@ -2,7 +2,22 @@ import { useMemo, useState } from 'react'
 import type { RoomState, Task } from '../../shared/types'
 import { taskMatchesSearch } from '../../shared/taskSearch'
 
-export type OwnershipFilter = 'all' | 'mine' | 'not_mine'
+export const OWNERSHIP_PRESETS = ['all', 'mine', 'not_mine'] as const
+export type OwnershipPreset = (typeof OWNERSHIP_PRESETS)[number]
+
+/** «all» | «mine» | «not_mine» или ключ сотрудника (pcId). */
+export type OwnershipFilter = OwnershipPreset | string
+
+function matchesOwnership(
+  task: Task,
+  filter: OwnershipFilter,
+  myEmployeeKey: string
+): boolean {
+  if (filter === 'all') return true
+  if (filter === 'mine') return task.assignee_pc === myEmployeeKey
+  if (filter === 'not_mine') return task.assignee_pc !== myEmployeeKey
+  return task.assignee_pc === filter
+}
 
 export interface KanbanTaskFilters {
   priorityId: string
@@ -39,10 +54,7 @@ export function useKanbanTaskFilters(
       if (filters.typeId !== 'all' && task.type_id !== filters.typeId) {
         return false
       }
-      if (filters.ownership === 'mine' && task.assignee_pc !== myEmployeeKey) {
-        return false
-      }
-      if (filters.ownership === 'not_mine' && task.assignee_pc === myEmployeeKey) {
+      if (!matchesOwnership(task, filters.ownership, myEmployeeKey)) {
         return false
       }
       if (!taskMatchesSearch(task, filters.query, employees)) {

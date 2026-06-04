@@ -9,6 +9,7 @@ import {
   syncHistoryDir,
   syncHistoryFilePath
 } from './syncPaths'
+import { assertTaskId } from './syncPathSecurity'
 
 interface TaskHistoryData {
   entries: TaskHistoryEntry[]
@@ -100,6 +101,7 @@ export class TaskHistoryStore {
 
   async appendMany(taskId: string, drafts: HistoryDraft[]): Promise<void> {
     if (drafts.length === 0) return
+    assertTaskId(taskId)
     await this.mutex.run(async () => {
       const file = await this.readTaskFile(taskId)
       for (const draft of drafts) {
@@ -112,5 +114,16 @@ export class TaskHistoryStore {
   async getForTask(taskId: string, limit = 100): Promise<TaskHistoryEntry[]> {
     const file = await this.readTaskFile(taskId)
     return file.entries.sort((a, b) => b.at - a.at).slice(0, limit)
+  }
+
+  async deleteForTask(taskId: string): Promise<void> {
+    assertTaskId(taskId)
+    await this.mutex.run(async () => {
+      try {
+        await fs.unlink(syncHistoryFilePath(this.roomPath, taskId))
+      } catch {
+        /* no file */
+      }
+    })
   }
 }

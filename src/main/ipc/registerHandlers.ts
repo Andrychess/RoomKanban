@@ -29,6 +29,8 @@ import type {
 } from '../../shared/types'
 import type { TaskStatus } from '../../shared/taskStatus'
 import { listKnownRooms } from '../room/listRooms'
+import { setWindowSubscription } from './windowSubscriptions'
+import { assertEmployeeKey, assertTaskId } from '../sync/syncPathSecurity'
 
 let boardSync: BoardSyncManager | null = null
 let taskLockStore: TaskLockStore | null = null
@@ -58,12 +60,12 @@ function requireChief(room: Room | null): Room {
 }
 
 async function startRoomSync(room: Room, roomManager: RoomManager): Promise<void> {
-  boardSync?.stop()
+  await boardSync?.stop()
   taskLockStore?.stop()
-  taskTypesStore?.stop()
-  taskPrioritiesStore?.stop()
-  taskTemplatesStore?.stop()
-  exchangeStore?.stop()
+  await taskTypesStore?.stop()
+  await taskPrioritiesStore?.stop()
+  await taskTemplatesStore?.stop()
+  await exchangeStore?.stop()
   reminderScheduler?.stop()
 
   taskTypesStore = new TaskTypesStore(room.path)
@@ -131,6 +133,11 @@ export function registerHandlers(
       throw new Error(`Задачу редактирует: ${lock.employee_name}`)
     }
   }
+  ipcMain.handle('get-user-documentation', async () => {
+    const { loadDocumentation } = await import('../help/loadUserGuide')
+    return loadDocumentation()
+  })
+
   ipcMain.handle('get-app-theme', async () => settingsStore.getTheme())
 
   ipcMain.handle('set-app-theme', async (_e, theme: 'light' | 'dark') => {
@@ -341,32 +348,30 @@ export function registerHandlers(
 
   ipcMain.handle('subscribe-task-priorities', (event) => {
     if (!taskPrioritiesStore) return
-
-    const listener = (priorities: TaskPriority[]) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('task-priorities-updated', priorities)
+    setWindowSubscription(event.sender, 'task-priorities', () => {
+      const listener = (priorities: TaskPriority[]) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('task-priorities-updated', priorities)
+        }
       }
-    }
-
-    const unsubscribe = taskPrioritiesStore.onPrioritiesChanged(listener)
-    void taskPrioritiesStore.getPriorities().then(listener)
-
-    event.sender.on('destroyed', () => unsubscribe())
+      const unsubscribe = taskPrioritiesStore!.onPrioritiesChanged(listener)
+      void taskPrioritiesStore!.getPriorities().then(listener)
+      return unsubscribe
+    })
   })
 
   ipcMain.handle('subscribe-task-types', (event) => {
     if (!taskTypesStore) return
-
-    const listener = (types: TaskType[]) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('task-types-updated', types)
+    setWindowSubscription(event.sender, 'task-types', () => {
+      const listener = (types: TaskType[]) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('task-types-updated', types)
+        }
       }
-    }
-
-    const unsubscribe = taskTypesStore.onTypesChanged(listener)
-    void taskTypesStore.getTypes().then(listener)
-
-    event.sender.on('destroyed', () => unsubscribe())
+      const unsubscribe = taskTypesStore!.onTypesChanged(listener)
+      void taskTypesStore!.getTypes().then(listener)
+      return unsubscribe
+    })
   })
 
   ipcMain.handle('get-tasks', async () => {
@@ -381,8 +386,13 @@ export function registerHandlers(
 
   ipcMain.handle('update-task', async (_e, input: UpdateTaskInput) => {
     if (!boardSync) throw new Error('Комната не открыта')
+    assertTaskId(input.id)
     await assertTaskEditLock(input.id)
-    return boardSync.updateTask(input)
+    try {
+      return await boardSync.updateTask(input)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('refresh-room-sync', async () => {
@@ -424,7 +434,12 @@ export function registerHandlers(
 
   ipcMain.handle('update-task-status', async (_e, taskId: string, status: Task['status']) => {
     if (!boardSync) throw new Error('Комната не открыта')
-    await boardSync.updateTaskStatus(taskId, status)
+    assertTaskId(taskId)
+    try {
+      await boardSync.updateTaskStatus(taskId, status)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('clear-done-tasks', async () => {
@@ -444,7 +459,18 @@ export function registerHandlers(
 
   ipcMain.handle('restore-archived-task', async (_e, taskId: string) => {
     if (!boardSync) throw new Error('Комната не открыта')
+    assertTaskId(taskId)
     return boardSync.restoreArchivedTask(taskId)
+  })
+
+  ipcMain.handle('delete-archived-task', async (_e, taskId: string) => {
+    if (!boardSync) throw new Error('Комната не открыта')
+    assertTaskId(taskId)
+    try {
+      await boardSync.deleteArchivedTask(taskId)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('get-task-history', async (_e, taskId: string) => {
@@ -454,7 +480,12 @@ export function registerHandlers(
 
   ipcMain.handle('add-task-comment', async (_e, taskId: string, text: string) => {
     if (!boardSync) throw new Error('Комната не открыта')
-    return boardSync.addTaskComment(taskId, text)
+    assertTaskId(taskId)
+    try {
+      return await boardSync.addTaskComment(taskId, text)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('get-chief-dashboard', async () => {
@@ -503,14 +534,16 @@ export function registerHandlers(
 
   ipcMain.handle('subscribe-task-templates', (event) => {
     if (!taskTemplatesStore) return
-    const listener = (templates: TaskTemplate[]) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('task-templates-updated', templates)
+    setWindowSubscription(event.sender, 'task-templates', () => {
+      const listener = (templates: TaskTemplate[]) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('task-templates-updated', templates)
+        }
       }
-    }
-    const unsubscribe = taskTemplatesStore.onTemplatesChanged(listener)
-    void taskTemplatesStore.getTemplates().then(listener)
-    event.sender.on('destroyed', () => unsubscribe())
+      const unsubscribe = taskTemplatesStore!.onTemplatesChanged(listener)
+      void taskTemplatesStore!.getTemplates().then(listener)
+      return unsubscribe
+    })
   })
 
   ipcMain.handle(
@@ -529,10 +562,15 @@ export function registerHandlers(
   ipcMain.handle('add-exchange-files', async (_e, employeeKey: string, paths: string[]) => {
     const room = requireOpenRoom()
     if (!exchangeStore) throw new Error('Комната не открыта')
+    assertEmployeeKey(employeeKey)
     if (!room.state.employees[employeeKey]) {
       throw new Error('Сотрудник не найден')
     }
-    return exchangeStore.addFiles(employeeKey, paths)
+    try {
+      return await exchangeStore.addFiles(employeeKey, paths)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('clear-exchange-files', async (_e, employeeKey: string) => {
@@ -553,32 +591,30 @@ export function registerHandlers(
 
   ipcMain.handle('subscribe-exchange', (event) => {
     if (!exchangeStore) return
-
-    const listener = (files: Record<string, import('../../shared/types').TaskFile[]>) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('exchange-updated', files)
+    setWindowSubscription(event.sender, 'exchange', () => {
+      const listener = (files: Record<string, import('../../shared/types').TaskFile[]>) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('exchange-updated', files)
+        }
       }
-    }
-
-    const unsubscribe = exchangeStore.onExchangeChanged(listener)
-    void exchangeStore.getAll().then(listener)
-
-    event.sender.on('destroyed', () => unsubscribe())
+      const unsubscribe = exchangeStore!.onExchangeChanged(listener)
+      void exchangeStore!.getAll().then(listener)
+      return unsubscribe
+    })
   })
 
   ipcMain.handle('subscribe-tasks', (event) => {
     if (!boardSync) return
-
-    const listener = (tasks: Task[]) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('tasks-updated', tasks)
+    setWindowSubscription(event.sender, 'tasks', () => {
+      const listener = (tasks: Task[]) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('tasks-updated', tasks)
+        }
       }
-    }
-
-    const unsubscribe = boardSync.onTasksChanged(listener)
-    void boardSync.getTasks().then(listener)
-
-    event.sender.on('destroyed', () => unsubscribe())
+      const unsubscribe = boardSync!.onTasksChanged(listener)
+      void boardSync!.getTasks().then(listener)
+      return unsubscribe
+    })
   })
 }
 
@@ -587,21 +623,21 @@ export async function closeRoomFully(roomManager: RoomManager): Promise<void> {
   if (room && taskLockStore) {
     await taskLockStore.releaseAllForEmployee(room.pcId).catch(() => {})
   }
-  boardSync?.stop()
+  await boardSync?.stop()
   boardSync = null
   taskLockStore?.stop()
   taskLockStore = null
-  taskTypesStore?.stop()
+  await taskTypesStore?.stop()
   taskTypesStore = null
-  taskPrioritiesStore?.stop()
+  await taskPrioritiesStore?.stop()
   taskPrioritiesStore = null
-  taskTemplatesStore?.stop()
+  await taskTemplatesStore?.stop()
   taskTemplatesStore = null
   taskHistoryStore = null
   reminderSettingsStore = null
   reminderScheduler?.stop()
   reminderScheduler = null
-  exchangeStore?.stop()
+  await exchangeStore?.stop()
   exchangeStore = null
   await roomManager.closeRoom()
 }

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Room, Task } from '../../shared/types'
 import { STATUS_LABELS } from '../../shared/taskStatus'
 import { formatDueDate } from '../utils/dates'
+import ConfirmDialog from '../components/ConfirmDialog'
 import TaskEditor from '../components/TaskEditor'
+import TooltipWrap from '../components/TooltipWrap'
+import { UI_HINTS } from '../hints/uiHints'
 import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
@@ -21,6 +24,8 @@ export default function ArchiveScreen({ room, onTasksChanged }: Props) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -45,11 +50,32 @@ export default function ArchiveScreen({ room, onTasksChanged }: Props) {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await window.api.deleteArchivedTask(deleteTarget.id)
+      if (editingTask?.id === deleteTarget.id) {
+        setEditingTask(null)
+      }
+      setDeleteTarget(null)
+      await load()
+      onTasksChanged()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось удалить')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="archive-page">
       <div className="archive-page-header">
         <h2>Архив задач</h2>
-        <p className="lead">Выполненные задачи, убранные с доски. Файлы сохранены.</p>
+        <p className="lead">
+          Выполненные задачи, убранные с доски. Можно вернуть на доску или удалить безвозвратно
+          (вместе с файлами и историей).
+        </p>
         <button type="button" className="btn" disabled={loading} onClick={() => void load()}>
           Обновить
         </button>
@@ -77,17 +103,46 @@ export default function ArchiveScreen({ room, onTasksChanged }: Props) {
                   </span>
                 </div>
                 <div className="archive-row-actions">
-                  <button type="button" className="btn" onClick={() => setEditingTask(task)}>
-                    Открыть
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={() => void restore(task.id)}>
-                    Вернуть на доску
-                  </button>
+                  <TooltipWrap text={UI_HINTS.archive.open}>
+                    <button type="button" className="btn" onClick={() => setEditingTask(task)}>
+                      Открыть
+                    </button>
+                  </TooltipWrap>
+                  <TooltipWrap text={UI_HINTS.archive.restore}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => void restore(task.id)}
+                    >
+                      Вернуть на доску
+                    </button>
+                  </TooltipWrap>
+                  <TooltipWrap text={UI_HINTS.archive.delete}>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => setDeleteTarget(task)}
+                    >
+                      Удалить
+                    </button>
+                  </TooltipWrap>
                 </div>
               </li>
             )
           })}
         </ul>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Удалить задачу из архива?"
+          message={`«${deleteTarget.title}» будет удалена безвозвратно вместе с прикреплёнными файлами и историей изменений.`}
+          confirmLabel="Удалить"
+          danger
+          loading={deleting}
+          onCancel={() => !deleting && setDeleteTarget(null)}
+          onConfirm={() => void confirmDelete()}
+        />
       )}
 
       {editingTask && (
