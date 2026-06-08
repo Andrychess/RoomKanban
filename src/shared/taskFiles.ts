@@ -19,3 +19,11 @@ export function taskFilesOfKind(task: { source_files: TaskFile[]; completed_file
 export function taskHasFiles(task: { source_files: TaskFile[]; completed_files: TaskFile[] }): boolean {
   return task.source_files.length > 0 || task.completed_files.length > 0
 }
+
+export function formatFileCountRu(count: number): string {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return `${count} файл`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${count} файла`
+  return `${count} файлов`
+}

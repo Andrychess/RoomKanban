@@ -258,6 +258,7 @@ export class ExchangeStore {
   }
 
   private employeeDir(employeeKey: string): string {
+    assertEmployeeKey(employeeKey)
     return path.join(this.docsExchangePath, employeeKey)
   }
 

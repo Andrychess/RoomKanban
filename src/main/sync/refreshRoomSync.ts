@@ -21,7 +21,14 @@ export async function refreshRoomSync(stores: {
   if (stores.taskTypesStore) jobs.push(stores.taskTypesStore.reload())
   if (stores.taskPrioritiesStore) jobs.push(stores.taskPrioritiesStore.reload())
   if (stores.taskTemplatesStore) jobs.push(stores.taskTemplatesStore.reload())
-  await Promise.all(jobs)
+
+  const results = await Promise.allSettled(jobs)
+  const failed = results.filter((r) => r.status === 'rejected')
+  if (failed.length > 0) {
+    const reason = failed[0].status === 'rejected' ? failed[0].reason : null
+    throw reason instanceof Error ? reason : new Error('Не удалось обновить часть данных комнаты')
+  }
+
   broadcastRoomSync({ source: 'all', manual: true })
   broadcastRoomDataRefresh()
   return { refreshed_at: Date.now() }

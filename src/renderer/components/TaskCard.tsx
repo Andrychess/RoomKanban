@@ -1,7 +1,7 @@
 import { type ChangeEvent, type CSSProperties, type MouseEvent } from 'react'
 import type { Employee, Task, TaskFileKind, TaskPriority, TaskType } from '../../shared/types'
 import { STATUS_LABELS, TASK_STATUSES, type TaskStatus } from '../../shared/taskStatus'
-import { TASK_FILE_GROUP_LABELS, taskHasFiles } from '../../shared/taskFiles'
+import { TASK_FILE_GROUP_LABELS, taskHasFiles, formatFileCountRu } from '../../shared/taskFiles'
 import { isTaskOverdue } from '../../shared/overdue'
 import { UI_HINTS } from '../hints/uiHints'
 import { formatDueDate, formatDueDateShort } from '../utils/dates'
@@ -335,7 +335,7 @@ export default function TaskCard({
 
             <div className="task-card-compact-bottom">
               <div className="task-card-compact-assignee">
-              <AssigneeAvatar name={assigneeName} />
+              <AssigneeAvatar name={assignee?.name ?? ''} />
               <div className="task-card-compact-assignee-text">
                 <span className="task-card-compact-assignee-name">{assigneeName}</span>
                 {assignee?.role && (
@@ -349,9 +349,7 @@ export default function TaskCard({
                   <ChecklistProgress done={checklistDone} total={checklistTotal} />
                 )}
                 {hasFiles && (
-                  <span className="task-card-compact-badge">
-                    {fileEntries.length} файл{fileEntries.length === 1 ? '' : fileEntries.length < 5 ? 'а' : 'ов'}
-                  </span>
+                  <span className="task-card-compact-badge">{formatFileCountRu(fileEntries.length)}</span>
                 )}
               </div>
             )}
@@ -400,7 +398,7 @@ export default function TaskCard({
                   )}
                   {hasFiles && (
                     <span className="task-card-stat-pill">
-                      {fileEntries.length} файл{fileEntries.length === 1 ? '' : fileEntries.length < 5 ? 'а' : 'ов'}
+                      {formatFileCountRu(fileEntries.length)}
                     </span>
                   )}
                 </div>

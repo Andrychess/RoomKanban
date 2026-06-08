@@ -121,7 +121,6 @@ export interface RoomKanbanApi {
   getAppUpdateStatus: () => Promise<AppUpdateStatus>
   isAppUpdateEnabled: () => Promise<boolean>
   startAppUpdate: () => Promise<AppUpdateStatus>
-  installAppUpdate: () => Promise<void>
   onAppUpdateStatus: (callback: (status: AppUpdateStatus) => void) => () => void
   onOpenAppUpdate: (callback: () => void) => () => void
 }
@@ -277,7 +276,6 @@ const api: RoomKanbanApi = {
   getAppUpdateStatus: () => ipcRenderer.invoke('get-app-update-status'),
   isAppUpdateEnabled: () => ipcRenderer.invoke('is-app-update-enabled'),
   startAppUpdate: () => ipcRenderer.invoke('start-app-update'),
-  installAppUpdate: () => ipcRenderer.invoke('install-app-update'),
   onAppUpdateStatus: (callback) => {
     const handler = (_: unknown, status: AppUpdateStatus) => callback(status)
     ipcRenderer.on('app-update-status', handler)

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 const STORAGE_KEY = 'roomKanban:notesPanelCollapsed'
 
@@ -27,6 +27,10 @@ function saveCollapsed(roomPath: string, collapsed: boolean): void {
 
 export function useNotesPanelCollapsed(roomPath: string) {
   const [collapsed, setCollapsed] = useState(() => readCollapsed(roomPath))
+
+  useEffect(() => {
+    setCollapsed(readCollapsed(roomPath))
+  }, [roomPath])
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {

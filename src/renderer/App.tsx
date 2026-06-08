@@ -66,6 +66,7 @@ export default function App() {
   const overdueCount = useOverdueCount(roomTasks)
   const { toast: syncToast, dismissToast } = useSyncNotifications(inRoomView)
   const [syncRefreshing, setSyncRefreshing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const { status: appUpdateStatus, panelOpen, startUpdate, closePanel, openPanel } = useAppUpdate()
 
   const currentEmployeeName =
@@ -215,14 +216,25 @@ export default function App() {
                       disabled={syncRefreshing}
                       onClick={() => {
                         setSyncRefreshing(true)
+                        setSyncError(null)
                         void window.api
                           .refreshRoomSync()
+                          .catch((err: unknown) => {
+                            setSyncError(
+                              err instanceof Error ? err.message : 'Не удалось обновить синхронизацию'
+                            )
+                          })
                           .finally(() => setSyncRefreshing(false))
                       }}
                     >
                       {syncRefreshing ? 'Обновление…' : 'Обновить синхронизацию'}
                     </button>
                   </TooltipWrap>
+                  {syncError && (
+                    <span className="room-bar-sync-error" role="alert">
+                      {syncError}
+                    </span>
+                  )}
                   <TooltipWrap text={UI_HINTS.roomBar.leave}>
                     <button
                       type="button"

@@ -416,19 +416,24 @@ export function registerHandlers(
 
   ipcMain.handle('refresh-room-sync', async () => {
     requireOpenRoom()
-    return refreshRoomSync({
-      boardSync,
-      exchangeStore,
-      notesStore,
-      taskTypesStore,
-      taskPrioritiesStore,
-      taskTemplatesStore
-    })
+    try {
+      return await refreshRoomSync({
+        boardSync,
+        exchangeStore,
+        notesStore,
+        taskTypesStore,
+        taskPrioritiesStore,
+        taskTemplatesStore
+      })
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('acquire-task-lock', async (_e, taskId: string) => {
     const room = requireOpenRoom()
     if (!taskLockStore) throw new Error('Комната не открыта')
+    assertTaskId(taskId)
     const name = room.state.employees[room.pcId]?.name ?? 'Сотрудник'
     return taskLockStore.acquire(taskId, room.pcId, name)
   })
@@ -480,7 +485,11 @@ export function registerHandlers(
   ipcMain.handle('restore-archived-task', async (_e, taskId: string) => {
     if (!boardSync) throw new Error('Комната не открыта')
     assertTaskId(taskId)
-    return boardSync.restoreArchivedTask(taskId)
+    try {
+      return await boardSync.restoreArchivedTask(taskId)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('delete-task', async (_e, taskId: string) => {
@@ -506,6 +515,7 @@ export function registerHandlers(
   })
 
   ipcMain.handle('get-task-history', async (_e, taskId: string) => {
+    assertTaskId(taskId)
     if (!taskHistoryStore) return []
     return taskHistoryStore.getForTask(taskId)
   })
@@ -631,7 +641,12 @@ export function registerHandlers(
     'open-task-file',
     async (_e, taskId: string, kind: TaskFileKind, fileId: string) => {
       if (!boardSync) throw new Error('Комната не открыта')
-      await boardSync.openTaskFile(taskId, kind, fileId)
+      assertTaskId(taskId)
+      try {
+        await boardSync.openTaskFile(taskId, kind, fileId)
+      } catch (err) {
+        throw new Error(toErrorMessage(err))
+      }
     }
   )
 
@@ -657,17 +672,32 @@ export function registerHandlers(
   ipcMain.handle('clear-exchange-files', async (_e, employeeKey: string) => {
     requireOpenRoom()
     if (!exchangeStore) throw new Error('Комната не открыта')
-    return exchangeStore.clearEmployee(employeeKey)
+    assertEmployeeKey(employeeKey)
+    try {
+      return await exchangeStore.clearEmployee(employeeKey)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('remove-exchange-file', async (_e, employeeKey: string, fileId: string) => {
     if (!exchangeStore) throw new Error('Комната не открыта')
-    await exchangeStore.removeFile(employeeKey, fileId)
+    assertEmployeeKey(employeeKey)
+    try {
+      await exchangeStore.removeFile(employeeKey, fileId)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('open-exchange-file', async (_e, employeeKey: string, fileId: string) => {
     if (!exchangeStore) throw new Error('Комната не открыта')
-    await exchangeStore.openFile(employeeKey, fileId)
+    assertEmployeeKey(employeeKey)
+    try {
+      await exchangeStore.openFile(employeeKey, fileId)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
   })
 
   ipcMain.handle('subscribe-exchange', (event) => {

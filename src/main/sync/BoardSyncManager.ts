@@ -375,7 +375,11 @@ export class BoardSyncManager {
   }
 
   private async refreshOneTask(taskId: string, fromExternal: boolean): Promise<void> {
-    if (!/^task_[a-z0-9]+\.json$/.test(`${taskId}.json`)) return
+    try {
+      assertTaskId(taskId)
+    } catch {
+      return
+    }
     await this.mutex.run(async () => {
       try {
         const task = await this.readTaskFromDisk(taskId)
@@ -659,14 +663,14 @@ export class BoardSyncManager {
   async updateTaskStatus(taskId: string, status: Task['status']): Promise<void> {
     await this.withBoardMutation(async (tasks) => {
       const idx = tasks.findIndex((t) => t.id === taskId)
-      if (idx === -1) return
+      if (idx === -1) throw new Error('Задача не найдена')
       const prev = tasks[idx]
       const updated: Task = {
         ...prev,
         status,
         updated_at: Math.floor(Date.now() / 1000)
       }
-      const merged = await this.persistTask(updated, { force: true })
+      const merged = await this.persistTask(updated)
       await this.recordHistory(prev, this.taskCache.get(updated.id) ?? updated)
       await this.finishMutation(merged)
     })

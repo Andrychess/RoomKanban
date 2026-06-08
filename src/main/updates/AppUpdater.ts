@@ -53,13 +53,16 @@ export class AppUpdater {
     })
 
     autoUpdater.on('update-available', (info) => {
+      const downloading = this.userInitiatedFlow
       this.patchStatus({
         phase: 'available',
         availableVersion: info.version,
         progress: undefined,
-        message: `Доступна версия ${info.version}. Загружаем…`
+        message: downloading
+          ? `Доступна версия ${info.version}. Загружаем…`
+          : `Доступна версия ${info.version}. Нажмите «Обновить», чтобы установить.`
       })
-      if (this.userInitiatedFlow) {
+      if (downloading) {
         void this.downloadUpdate()
       }
     })
@@ -153,6 +156,7 @@ export class AppUpdater {
   }
 
   quitAndInstall(): void {
+    if (this.status.phase !== 'downloaded') return
     autoUpdater.quitAndInstall(false, true)
   }
 

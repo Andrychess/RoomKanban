@@ -42,19 +42,17 @@ export default function AppUpdatePanel({ status, open, onClose, onUpdate }: Prop
   const updateReady = hasUpdateReady(status)
 
   if (!open) {
+    const hasError = status?.phase === 'error'
     return (
       <button
         type="button"
-        className={`btn btn-ghost btn-sm app-update-trigger ${updateReady ? 'app-update-trigger--ready' : ''}`}
+        className={`btn btn-ghost btn-sm app-update-trigger ${updateReady ? 'app-update-trigger--ready' : ''} ${hasError ? 'app-update-trigger--error' : ''}`}
         onClick={onUpdate}
         disabled={busy}
-        title={
-          enabled
-            ? 'Проверить и установить обновление приложения'
-            : 'Обновления доступны в установленной версии'
-        }
+        title={status?.message ?? (enabled ? 'Проверить и установить обновление приложения' : 'Обновления доступны в установленной версии')}
       >
         {updateReady && <span className="app-update-dot" aria-hidden="true" />}
+        {hasError && <span className="app-update-dot app-update-dot--error" aria-hidden="true" />}
         {getButtonLabel(status)}
         {status?.currentVersion && (
           <span className="app-update-version">v{status.currentVersion}</span>
@@ -71,7 +69,13 @@ export default function AppUpdatePanel({ status, open, onClose, onUpdate }: Prop
         aria-label="Закрыть окно обновления"
         onClick={onClose}
       />
-      <div className="app-update-panel" role="dialog" aria-labelledby="app-update-title">
+      <div
+        className="app-update-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="app-update-title"
+        aria-describedby="app-update-lead"
+      >
         <div className="app-update-panel-header">
           <h2 id="app-update-title">Обновление RoomKanban</h2>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Закрыть">
@@ -79,7 +83,11 @@ export default function AppUpdatePanel({ status, open, onClose, onUpdate }: Prop
           </button>
         </div>
 
-        <p className="app-update-panel-lead">
+        <p
+          id="app-update-lead"
+          className={`app-update-panel-lead ${status?.phase === 'error' ? 'app-update-panel-lead--error' : ''}`}
+          role={status?.phase === 'error' ? 'alert' : undefined}
+        >
           {status?.message ??
             (enabled
               ? 'Нажмите кнопку ниже — приложение само проверит, скачает и установит новую версию.'

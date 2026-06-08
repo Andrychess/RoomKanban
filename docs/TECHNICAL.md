@@ -1,6 +1,6 @@
 # RoomKanban — техническая документация {#обзор-технический}
 
-**RoomKanban** (репозиторий `OficceHelper`, npm-пакет `room-kanban`) — настольное приложение на **Electron** для канбан-задач с синхронизацией через общую папку. Целевая аудиозапись этого документа: **разработчики** и **IT-администраторы** (сборка, развёртывание, структура данных, интеграция с файловым хранилищем).
+**RoomKanban** (репозиторий `OficceHelper`, npm-пакет `room-kanban`) — настольное приложение на **Electron** для канбан-задач с синхронизацией через общую папку. Целевая аудитория этого документа: **разработчики** и **IT-администраторы** (сборка, развёртывание, структура данных, интеграция с файловым хранилищем).
 
 Пользовательское руководство: `README.md` / `docs/USER_GUIDE.md` (якоря `обзор`, `канбан-и-задачи` и т.д.). В приложении справка загружается из `src/main/help/loadUserGuide.ts` — парсинг Markdown с заголовками `## … {#id}`.
 
@@ -454,7 +454,7 @@ OficceHelper/
 | `dist:dir` | `build` + `electron-builder --win --dir` | `win-unpacked` без установщика |
 | `typecheck` | `tsc --noEmit` (node + web) | Статическая проверка типов |
 
-Зависимости runtime: только **chokidar**. Остальное — devDependencies (electron, vite, react, typescript, electron-builder).
+Зависимости runtime: **chokidar**, **electron-updater**. Остальное — devDependencies (electron, vite, react, typescript, electron-builder).
 
 ---
 

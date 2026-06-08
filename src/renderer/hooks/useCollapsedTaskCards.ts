@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 function storageKey(roomPath: string): string {
   return `roomKanban:expandedCards:${roomPath}`
@@ -21,6 +21,10 @@ function saveExpandedIds(roomPath: string, ids: Set<string>): void {
 
 export function useCollapsedTaskCards(roomPath: string) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => readExpandedIds(roomPath))
+
+  useEffect(() => {
+    setExpandedIds(readExpandedIds(roomPath))
+  }, [roomPath])
 
   const isTaskCollapsed = useCallback(
     (taskId: string) => !expandedIds.has(taskId),
