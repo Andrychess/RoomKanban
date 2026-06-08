@@ -19,6 +19,9 @@ import TaskHistoryPanel from './TaskHistoryPanel'
 import { mergeDueDateTime, splitDueDateTime } from '../utils/dates'
 import TaskTemplatePicker, { type TemplateApplyValues } from './TaskTemplatePicker'
 import TaskConflictDialog from './TaskConflictDialog'
+import ConfirmDialog from './ConfirmDialog'
+import TooltipWrap from './TooltipWrap'
+import { UI_HINTS } from '../hints/uiHints'
 import { useTaskTemplates } from '../hooks/useTaskTemplates'
 
 export type TaskEditorMode = 'create' | 'edit' | 'view'
@@ -57,7 +60,7 @@ export default function TaskEditor({
   onClose,
   onSaved
 }: Props) {
-  const mode: TaskEditorMode = modeProp ?? (task ? 'edit' : 'create')
+  const [mode, setMode] = useState<TaskEditorMode>(() => modeProp ?? (task ? 'edit' : 'create'))
   const isCreate = mode === 'create'
   const isView = mode === 'view'
   const isEdit = mode === 'edit'
@@ -90,6 +93,12 @@ export default function TaskEditor({
   const [clientBaseUpdatedAt, setClientBaseUpdatedAt] = useState(task?.updated_at ?? 0)
   const [lockBlockedBy, setLockBlockedBy] = useState<string | null>(null)
   const [lockReady, setLockReady] = useState(!task)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    setMode(modeProp ?? (task ? 'edit' : 'create'))
+  }, [modeProp, task?.id])
 
   useEffect(() => {
     setLiveTask(task)
@@ -322,8 +331,71 @@ export default function TaskEditor({
         ? 'Подробнее о задаче'
         : 'Редактирование'
 
+  const canDelete = Boolean(task && !readOnlyArchived && !isCreate)
+
+  async function confirmDelete() {
+    if (!task) return
+    setDeleting(true)
+    setError('')
+    try {
+      await window.api.releaseTaskLock(task.id)
+      await window.api.deleteTask(task.id)
+      setDeleteOpen(false)
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось удалить задачу')
+      setDeleteOpen(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  function renderEditButton(disabled = false) {
+    if (readOnlyArchived || isCreate || !isView) return null
+    return (
+      <TooltipWrap text={UI_HINTS.taskCard.edit}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={disabled || deleting}
+          onClick={() => setMode('edit')}
+        >
+          Редактировать
+        </button>
+      </TooltipWrap>
+    )
+  }
+
+  function renderDeleteButton(disabled = false) {
+    if (!canDelete) return null
+    return (
+      <TooltipWrap text={UI_HINTS.taskEditor.delete}>
+        <button
+          type="button"
+          className="btn btn-danger"
+          disabled={disabled || deleting}
+          onClick={() => setDeleteOpen(true)}
+        >
+          Удалить
+        </button>
+      </TooltipWrap>
+    )
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
+      {deleteOpen && task && (
+        <ConfirmDialog
+          title="Удалить задачу?"
+          message={`«${task.title}» будет удалена безвозвратно вместе с прикреплёнными файлами и историей изменений.`}
+          confirmLabel="Удалить"
+          danger
+          loading={deleting}
+          onCancel={() => !deleting && setDeleteOpen(false)}
+          onConfirm={() => void confirmDelete()}
+        />
+      )}
       {conflictRemote && (
         <TaskConflictDialog
           remoteTask={conflictRemote}
@@ -433,7 +505,10 @@ export default function TaskEditor({
             <TaskHistoryPanel taskId={task.id} />
 
             <div className="actions-row task-editor-view-actions">
-              <button type="button" className="btn" onClick={onClose} disabled={loading}>
+              {renderDeleteButton(loading)}
+              <div className="task-editor-actions-main">
+                {renderEditButton(loading)}
+              <button type="button" className="btn" onClick={onClose} disabled={loading || deleting}>
                 {hasPendingFiles ? 'Отмена' : 'Закрыть'}
               </button>
               {hasPendingFiles && (
@@ -454,6 +529,7 @@ export default function TaskEditor({
                   {loading ? 'Сохранение…' : 'Сохранить файлы'}
                 </button>
               )}
+              </div>
             </div>
           </div>
         ) : (
@@ -638,20 +714,23 @@ export default function TaskEditor({
 
             {task && <TaskHistoryPanel taskId={task.id} />}
 
-            <div className="actions-row">
-              <button type="button" className="btn" onClick={onClose} disabled={loading}>
-                {fieldsReadOnly && !hasPendingFiles ? 'Закрыть' : 'Отмена'}
-              </button>
-              {isEdit && !lockBlockedBy && (
-                <button type="submit" className="btn btn-primary btn-lg" disabled={formDisabled}>
-                  {loading ? 'Сохранение…' : 'Сохранить'}
+            <div className="actions-row task-editor-actions">
+              {renderDeleteButton(formDisabled)}
+              <div className="task-editor-actions-main">
+                <button type="button" className="btn" onClick={onClose} disabled={loading || deleting}>
+                  {fieldsReadOnly && !hasPendingFiles ? 'Закрыть' : 'Отмена'}
                 </button>
-              )}
-              {isCreate && (
-                <button type="submit" className="btn btn-primary btn-lg" disabled={formDisabled}>
-                  {loading ? 'Сохранение…' : 'Создать'}
-                </button>
-              )}
+                {isEdit && !lockBlockedBy && (
+                  <button type="submit" className="btn btn-primary btn-lg" disabled={formDisabled || deleting}>
+                    {loading ? 'Сохранение…' : 'Сохранить'}
+                  </button>
+                )}
+                {isCreate && (
+                  <button type="submit" className="btn btn-primary btn-lg" disabled={formDisabled || deleting}>
+                    {loading ? 'Сохранение…' : 'Создать'}
+                  </button>
+                )}
+              </div>
             </div>
           </form>
         )}

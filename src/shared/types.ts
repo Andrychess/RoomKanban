@@ -242,6 +242,21 @@ export interface Room {
   isChief: boolean
 }
 
+/** Заметка комнаты (общая панель под названием отдела). */
+export interface RoomNote {
+  id: string
+  title: string
+  text: string
+  created_at: number
+  updated_at: number
+  created_by_pc?: string
+}
+
+export interface RoomNotesData {
+  notes: RoomNote[]
+  updated_at: number
+}
+
 export type AppTheme = 'light' | 'dark'
 
 export interface ExchangeData {
@@ -260,6 +275,8 @@ export interface AppSettings {
   employeeBindings: Record<string, string>
   /** Сортировка задач в колонках канбана по пути комнаты */
   kanbanColumnSort?: Record<string, Partial<Record<TaskStatus, ColumnSortId>>>
+  /** Свёрнутые колонки канбана по пути комнаты */
+  kanbanColumnCollapsed?: Record<string, Partial<Record<TaskStatus, boolean>>>
   /** Отправленные напоминания: roomPath → taskId:dueDate:kind → timestamp */
   reminderSent?: Record<string, Record<string, number>>
   /** @deprecated миграция со старых версий */

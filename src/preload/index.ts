@@ -8,6 +8,7 @@ import type {
   ReminderSettings,
   Room,
   RoomEntryInfo,
+  RoomNote,
   RoomState,
   RoomsSyncSummary,
   Task,
@@ -53,6 +54,12 @@ export interface RoomKanbanApi {
     column: TaskStatus,
     sortId: ColumnSortId
   ) => Promise<Record<TaskStatus, ColumnSortId>>
+  getColumnCollapsed: (roomPath: string) => Promise<Record<TaskStatus, boolean>>
+  setColumnCollapsed: (
+    roomPath: string,
+    column: TaskStatus,
+    collapsed: boolean
+  ) => Promise<Record<TaskStatus, boolean>>
   addEmployee: (name: string, role: string) => Promise<Room>
   updateEmployee: (employeeKey: string, name: string, role: string) => Promise<Room>
   removeEmployee: (employeeKey: string) => Promise<Room>
@@ -79,6 +86,7 @@ export interface RoomKanbanApi {
   archiveDoneTasks: () => Promise<number>
   getArchivedTasks: () => Promise<Task[]>
   restoreArchivedTask: (taskId: string) => Promise<Task>
+  deleteTask: (taskId: string) => Promise<void>
   deleteArchivedTask: (taskId: string) => Promise<void>
   getTaskHistory: (taskId: string) => Promise<TaskHistoryEntry[]>
   addTaskComment: (taskId: string, text: string) => Promise<Task>
@@ -86,6 +94,11 @@ export interface RoomKanbanApi {
   getTaskTemplates: () => Promise<TaskTemplate[]>
   saveTaskTemplates: (templates: TaskTemplate[]) => Promise<TaskTemplate[]>
   subscribeTaskTemplates: (callback: (templates: TaskTemplate[]) => void) => () => void
+  getRoomNotes: () => Promise<RoomNote[]>
+  addRoomNote: (title: string, text: string) => Promise<RoomNote>
+  updateRoomNote: (noteId: string, title: string, text: string) => Promise<RoomNote>
+  deleteRoomNote: (noteId: string) => Promise<void>
+  subscribeRoomNotes: (callback: (notes: RoomNote[]) => void) => () => void
   getReminderSettings: () => Promise<ReminderSettings>
   saveReminderSettings: (settings: ReminderSettings) => Promise<ReminderSettings>
   getOverdueTasks: () => Promise<Task[]>
@@ -133,6 +146,9 @@ const api: RoomKanbanApi = {
   getColumnSorts: (roomPath) => ipcRenderer.invoke('get-column-sorts', roomPath),
   setColumnSort: (roomPath, column, sortId) =>
     ipcRenderer.invoke('set-column-sort', roomPath, column, sortId),
+  getColumnCollapsed: (roomPath) => ipcRenderer.invoke('get-column-collapsed', roomPath),
+  setColumnCollapsed: (roomPath, column, collapsed) =>
+    ipcRenderer.invoke('set-column-collapsed', roomPath, column, collapsed),
   addEmployee: (name, role) => ipcRenderer.invoke('add-employee', name, role),
   updateEmployee: (employeeKey, name, role) =>
     ipcRenderer.invoke('update-employee', employeeKey, name, role),
@@ -179,6 +195,7 @@ const api: RoomKanbanApi = {
   archiveDoneTasks: () => ipcRenderer.invoke('archive-done-tasks'),
   getArchivedTasks: () => ipcRenderer.invoke('get-archived-tasks'),
   restoreArchivedTask: (taskId) => ipcRenderer.invoke('restore-archived-task', taskId),
+  deleteTask: (taskId) => ipcRenderer.invoke('delete-task', taskId),
   deleteArchivedTask: (taskId) => ipcRenderer.invoke('delete-archived-task', taskId),
   getTaskHistory: (taskId) => ipcRenderer.invoke('get-task-history', taskId),
   addTaskComment: (taskId, text) => ipcRenderer.invoke('add-task-comment', taskId, text),
@@ -190,6 +207,17 @@ const api: RoomKanbanApi = {
     ipcRenderer.on('task-templates-updated', handler)
     void ipcRenderer.invoke('subscribe-task-templates')
     return () => ipcRenderer.removeListener('task-templates-updated', handler)
+  },
+  getRoomNotes: () => ipcRenderer.invoke('get-room-notes'),
+  addRoomNote: (title, text) => ipcRenderer.invoke('add-room-note', title, text),
+  updateRoomNote: (noteId, title, text) =>
+    ipcRenderer.invoke('update-room-note', noteId, title, text),
+  deleteRoomNote: (noteId) => ipcRenderer.invoke('delete-room-note', noteId),
+  subscribeRoomNotes: (callback) => {
+    const handler = (_: unknown, notes: RoomNote[]) => callback(notes)
+    ipcRenderer.on('room-notes-updated', handler)
+    void ipcRenderer.invoke('subscribe-room-notes')
+    return () => ipcRenderer.removeListener('room-notes-updated', handler)
   },
   getReminderSettings: () => ipcRenderer.invoke('get-reminder-settings'),
   saveReminderSettings: (settings) => ipcRenderer.invoke('save-reminder-settings', settings),

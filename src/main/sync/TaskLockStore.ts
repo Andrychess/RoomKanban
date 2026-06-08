@@ -86,6 +86,15 @@ export class TaskLockStore {
     })
   }
 
+  async clearLock(taskId: string): Promise<void> {
+    await this.mutex.run(async () => {
+      const file = await this.readLocks()
+      if (!file.locks[taskId]) return
+      delete file.locks[taskId]
+      await this.writeLocks(file.locks)
+    })
+  }
+
   async refresh(taskId: string, employeeKey: string): Promise<boolean> {
     return this.mutex.run(async () => {
       const now = Math.floor(Date.now() / 1000)

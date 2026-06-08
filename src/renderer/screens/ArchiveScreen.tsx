@@ -54,7 +54,7 @@ export default function ArchiveScreen({ room, onTasksChanged }: Props) {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await window.api.deleteArchivedTask(deleteTarget.id)
+      await window.api.deleteTask(deleteTarget.id)
       if (editingTask?.id === deleteTarget.id) {
         setEditingTask(null)
       }

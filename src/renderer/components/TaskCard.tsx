@@ -1,10 +1,10 @@
-import type { ChangeEvent, CSSProperties } from 'react'
+import { type ChangeEvent, type CSSProperties, type MouseEvent } from 'react'
 import type { Employee, Task, TaskFileKind, TaskPriority, TaskType } from '../../shared/types'
 import { STATUS_LABELS, TASK_STATUSES, type TaskStatus } from '../../shared/taskStatus'
 import { TASK_FILE_GROUP_LABELS, taskHasFiles } from '../../shared/taskFiles'
 import { isTaskOverdue } from '../../shared/overdue'
 import { UI_HINTS } from '../hints/uiHints'
-import { formatDueDate } from '../utils/dates'
+import { formatDueDate, formatDueDateShort } from '../utils/dates'
 import TooltipWrap from './TooltipWrap'
 import { findTaskPriority, findTaskType } from '../utils/taskTypes'
 
@@ -14,15 +14,19 @@ interface Props {
   taskPriorities: TaskPriority[]
   assignee?: Employee
   columnAccent?: string
+  isCollapsed: boolean
+  onToggleCollapse: () => void
   onViewDetails: (task: Task) => void
   onEdit: (task: Task) => void
   onOpenFile: (taskId: string, kind: TaskFileKind, fileId: string) => void
   onStatusChange: (taskId: string, status: TaskStatus) => void
 }
 
+const FILE_PREVIEW_LIMIT = 2
+
 function EditIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M4 20h4l10.5-10.5a1.4 1.4 0 0 0 0-2L14.5 3.5a1.4 1.4 0 0 0-2 0L4 12v8z"
         stroke="currentColor"
@@ -34,12 +38,138 @@ function EditIcon() {
   )
 }
 
+function DetailsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return Boolean(
+    target &&
+      (target as HTMLElement).closest('button, select, a, input, textarea, .task-card-no-drag')
+  )
+}
+
+function CollapseChevron({ collapsed }: { collapsed: boolean }) {
+  return (
+    <span
+      className={`task-card-collapse-chevron ${collapsed ? 'is-collapsed' : ''}`}
+      aria-hidden="true"
+    />
+  )
+}
+
+function AssigneeAvatar({ name }: { name: string }) {
+  const initial = name.trim().charAt(0).toUpperCase() || '?'
+  return (
+    <span className="task-card-avatar" aria-hidden="true">
+      {initial}
+    </span>
+  )
+}
+
+function TaskLabel({
+  label,
+  color,
+  variant,
+  title
+}: {
+  label: string
+  color?: string
+  variant: 'type' | 'priority' | 'due' | 'muted' | 'overdue'
+  title?: string
+}) {
+  return (
+    <span
+      className={`task-label task-label--${variant}`}
+      style={color ? ({ '--label-color': color } as CSSProperties) : undefined}
+      title={title ?? label}
+    >
+      {label}
+    </span>
+  )
+}
+
+function TaskLabelsRibbon({
+  taskType,
+  priority,
+  typeColor,
+  dueDate,
+  overdue
+}: {
+  taskType?: TaskType
+  priority?: TaskPriority
+  typeColor: string
+  dueDate: string | null
+  overdue: boolean
+}) {
+  return (
+    <div className="task-card-labels" aria-label="Метки задачи">
+      {taskType ? (
+        <TaskLabel
+          variant="type"
+          label={taskType.name}
+          color={typeColor}
+          title={`Вид: ${taskType.name}`}
+        />
+      ) : (
+        <TaskLabel variant="muted" label="Без вида" title="Вид не указан" />
+      )}
+      {priority ? (
+        <TaskLabel
+          variant="priority"
+          label={priority.name}
+          color={priority.color}
+          title={`Приоритет: ${priority.name}`}
+        />
+      ) : (
+        <TaskLabel variant="muted" label="Без приоритета" title="Приоритет не указан" />
+      )}
+      {dueDate ? (
+        <TaskLabel
+          variant={overdue ? 'overdue' : 'due'}
+          label={formatDueDateShort(dueDate)}
+          title={
+            overdue ? `Просрочено: ${formatDueDate(dueDate)}` : `Срок: ${formatDueDate(dueDate)}`
+          }
+        />
+      ) : (
+        <TaskLabel variant="muted" label="Без срока" title="Срок не указан" />
+      )}
+    </div>
+  )
+}
+
+function ChecklistProgress({ done, total }: { done: number; total: number }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  return (
+    <div className="task-card-checklist-progress" title={`Чек-лист: ${done} из ${total}`}>
+      <div className="task-card-checklist-track" aria-hidden="true">
+        <div className="task-card-checklist-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="task-card-checklist-label">
+        {done}/{total}
+      </span>
+    </div>
+  )
+}
+
 export default function TaskCard({
   task,
   taskTypes,
   taskPriorities,
   assignee,
   columnAccent,
+  isCollapsed,
+  onToggleCollapse,
   onViewDetails,
   onEdit,
   onOpenFile,
@@ -50,94 +180,66 @@ export default function TaskCard({
   const priority = findTaskPriority(taskPriorities, task.priority_id)
   const priorityColor = priority?.color ?? columnAccent ?? '#64748b'
   const typeColor = taskType?.color ?? '#64748b'
+  const checklistDone = task.checklist.filter((i) => i.done).length
+  const checklistTotal = task.checklist.length
+  const hasFiles = taskHasFiles(task)
+  const assigneeName = assignee?.name ?? '—'
+
+  const fileEntries = (['source', 'completed'] as const).flatMap((kind) =>
+    (kind === 'source' ? task.source_files : task.completed_files).map((file) => ({
+      kind,
+      file
+    }))
+  )
+  const previewFiles = fileEntries.slice(0, FILE_PREVIEW_LIMIT)
+  const hiddenFileCount = fileEntries.length - previewFiles.length
 
   function onStatusSelect(e: ChangeEvent<HTMLSelectElement>) {
     const next = e.target.value as TaskStatus
     if (next !== task.status) onStatusChange(task.id, next)
   }
 
-  return (
-    <article
-      className={`task-card ${overdue ? 'is-overdue' : ''} ${taskType ? 'task-card--has-type' : ''}`}
-      style={
-        {
-          borderLeftColor: priorityColor,
-          '--task-type-color': typeColor
-        } as CSSProperties
-      }
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/task-id', task.id)
-        e.dataTransfer.effectAllowed = 'move'
-      }}
-    >
-      {taskType && (
-        <div
-          className="task-card-type-bar"
-          style={{ backgroundColor: typeColor }}
-          title={`Вид: ${taskType.name}`}
+  function handleToggleAreaClick(e: MouseEvent<HTMLElement>) {
+    if (isInteractiveTarget(e.target)) return
+    onToggleCollapse()
+  }
+
+  function renderCollapseToggle(className: string, collapsed: boolean) {
+    return (
+      <TooltipWrap text={collapsed ? UI_HINTS.taskCard.expand : UI_HINTS.taskCard.collapse}>
+        <button
+          type="button"
+          className={`task-card-collapse-toggle task-card-no-drag ${className}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleCollapse()
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Развернуть карточку' : 'Свернуть карточку'}
         >
-          {taskType.name}
-        </div>
-      )}
+          <CollapseChevron collapsed={collapsed} />
+        </button>
+      </TooltipWrap>
+    )
+  }
 
-      <div className="task-card-body">
-        <div className="task-card-head">
-          {priority && (
-            <span
-              className="task-priority-pill"
-              style={{ borderColor: priority.color, color: priority.color }}
-            >
-              {priority.name}
-            </span>
-          )}
-          {task.due_date && (
-            <time className={`task-due ${overdue ? 'is-overdue' : ''}`} dateTime={task.due_date}>
-              до {formatDueDate(task.due_date)}
-            </time>
-          )}
-        </div>
-
-        <h4 className="task-card-title">{task.title}</h4>
-
-        {task.description && <p className="task-card-comment">{task.description}</p>}
-
-        {task.checklist.length > 0 && (
-          <p className="task-card-checklist">
-            Чек-лист: {task.checklist.filter((i) => i.done).length}/{task.checklist.length}
-          </p>
-        )}
-
-        {taskHasFiles(task) && (
-          <ul className="task-card-file-links">
-            {(['source', 'completed'] as const).map((kind) =>
-              (kind === 'source' ? task.source_files : task.completed_files).map((file) => (
-                <li key={file.id}>
-                  <button
-                    type="button"
-                    className="task-file-link"
-                    onClick={() => onOpenFile(task.id, kind, file.id)}
-                  >
-                    <span className="task-file-kind">{TASK_FILE_GROUP_LABELS[kind]}:</span> {file.file_name}
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-        )}
-
-        <p className="task-card-people">Ответственный: {assignee?.name ?? '—'}</p>
-      </div>
-
-      <div className="task-card-footer">
+  function renderFooter() {
+    return (
+      <div className={`task-card-footer ${isCollapsed ? 'task-card-footer--compact' : ''}`}>
         <label className="task-status-select-wrap" title={UI_HINTS.taskCard.status}>
-          <span className="task-status-select-label">Этап</span>
+          <span
+            className={`task-status-select-label ${isCollapsed ? 'task-status-select-label--sr' : ''}`}
+          >
+            Этап
+          </span>
           <select
-            className="task-status-select"
+            className="task-status-select task-card-no-drag"
             value={task.status}
             onChange={onStatusSelect}
             aria-label="На каком этапе задача"
             onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             {TASK_STATUSES.map((status) => (
               <option key={status} value={status}>
@@ -146,22 +248,207 @@ export default function TaskCard({
             ))}
           </select>
         </label>
-        <TooltipWrap text={UI_HINTS.taskCard.details}>
-          <button type="button" className="task-card-open-btn" onClick={() => onViewDetails(task)}>
-            Подробнее
-          </button>
-        </TooltipWrap>
-        <TooltipWrap text={UI_HINTS.taskCard.edit}>
-          <button
-            type="button"
-            className="task-card-edit-btn"
-            aria-label="Редактировать задачу"
-            onClick={() => onEdit(task)}
-          >
-            <EditIcon />
-          </button>
-        </TooltipWrap>
+        <div className="task-card-footer-actions">
+          <TooltipWrap text={UI_HINTS.taskCard.details}>
+            <button
+              type="button"
+              className={`task-card-icon-btn task-card-no-drag ${isCollapsed ? 'task-card-icon-btn--text' : ''}`}
+              onClick={() => onViewDetails(task)}
+            >
+              {isCollapsed ? (
+                <>
+                  <DetailsIcon />
+                  <span>Подробнее</span>
+                </>
+              ) : (
+                <>
+                  <DetailsIcon />
+                  <span className="task-card-icon-btn-label">Подробнее</span>
+                </>
+              )}
+            </button>
+          </TooltipWrap>
+          <TooltipWrap text={UI_HINTS.taskCard.edit}>
+            <button
+              type="button"
+              className="task-card-icon-btn task-card-icon-btn--edit task-card-no-drag"
+              aria-label="Редактировать задачу"
+              onClick={() => onEdit(task)}
+            >
+              <EditIcon />
+            </button>
+          </TooltipWrap>
+        </div>
       </div>
+    )
+  }
+
+  return (
+    <article
+      className={`task-card ${overdue ? 'is-overdue' : ''} ${isCollapsed ? 'is-collapsed' : 'is-expanded'}`}
+      style={
+        {
+          borderLeftColor: priorityColor,
+          '--task-type-color': typeColor,
+          '--task-priority-color': priorityColor
+        } as CSSProperties
+      }
+      draggable
+      onDragStart={(e) => {
+        if (isInteractiveTarget(e.target)) {
+          e.preventDefault()
+          return
+        }
+        e.dataTransfer.setData('text/task-id', task.id)
+        e.dataTransfer.effectAllowed = 'move'
+      }}
+    >
+      {isCollapsed ? (
+        <div
+          className="task-card-compact"
+          onClick={handleToggleAreaClick}
+          role="button"
+          tabIndex={0}
+          aria-expanded={false}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onToggleCollapse()
+            }
+          }}
+        >
+          <TaskLabelsRibbon
+            taskType={taskType}
+            priority={priority}
+            typeColor={typeColor}
+            dueDate={task.due_date}
+            overdue={overdue}
+          />
+
+          <div className="task-card-compact-main">
+            <div className="task-card-title-row task-card-title-row--compact">
+              {renderCollapseToggle('task-card-collapse-toggle--compact', true)}
+              <TooltipWrap text={task.title}>
+                <h4 className="task-card-title task-card-title--compact">{task.title}</h4>
+              </TooltipWrap>
+            </div>
+
+            <div className="task-card-compact-bottom">
+              <div className="task-card-compact-assignee">
+              <AssigneeAvatar name={assigneeName} />
+              <div className="task-card-compact-assignee-text">
+                <span className="task-card-compact-assignee-name">{assigneeName}</span>
+                {assignee?.role && (
+                  <span className="task-card-compact-assignee-role">{assignee.role}</span>
+                )}
+              </div>
+            </div>
+            {(checklistTotal > 0 || hasFiles) && (
+              <div className="task-card-compact-badges" aria-label="Дополнительно">
+                {checklistTotal > 0 && (
+                  <ChecklistProgress done={checklistDone} total={checklistTotal} />
+                )}
+                {hasFiles && (
+                  <span className="task-card-compact-badge">
+                    {fileEntries.length} файл{fileEntries.length === 1 ? '' : fileEntries.length < 5 ? 'а' : 'ов'}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          </div>
+        </div>
+      ) : (
+        <div className="task-card-expanded">
+          <TaskLabelsRibbon
+            taskType={taskType}
+            priority={priority}
+            typeColor={typeColor}
+            dueDate={task.due_date}
+            overdue={overdue}
+          />
+
+          <div className="task-card-body">
+            <div
+              className="task-card-title-row"
+              onClick={handleToggleAreaClick}
+              role="button"
+              tabIndex={0}
+              aria-expanded
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onToggleCollapse()
+                }
+              }}
+            >
+              {renderCollapseToggle('', false)}
+              <h4 className="task-card-title">{task.title}</h4>
+            </div>
+
+            <div className="task-card-details">
+              {task.description ? (
+                <p className="task-card-comment">{task.description}</p>
+              ) : (
+                <p className="task-card-comment task-card-comment--empty">Без описания</p>
+              )}
+
+              {(checklistTotal > 0 || hasFiles) && (
+                <div className="task-card-stats">
+                  {checklistTotal > 0 && (
+                    <ChecklistProgress done={checklistDone} total={checklistTotal} />
+                  )}
+                  {hasFiles && (
+                    <span className="task-card-stat-pill">
+                      {fileEntries.length} файл{fileEntries.length === 1 ? '' : fileEntries.length < 5 ? 'а' : 'ов'}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {hasFiles && (
+                <ul className="task-card-file-links">
+                  {previewFiles.map(({ kind, file }) => (
+                    <li key={file.id}>
+                      <button
+                        type="button"
+                        className="task-file-link task-card-no-drag"
+                        onClick={() => onOpenFile(task.id, kind, file.id)}
+                      >
+                        <span className="task-file-kind">{TASK_FILE_GROUP_LABELS[kind]}:</span>{' '}
+                        {file.file_name}
+                      </button>
+                    </li>
+                  ))}
+                  {hiddenFileCount > 0 && (
+                    <li>
+                      <button
+                        type="button"
+                        className="task-file-link task-file-link--more task-card-no-drag"
+                        onClick={() => onViewDetails(task)}
+                      >
+                        Ещё {hiddenFileCount}…
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
+
+              <div className="task-card-people">
+                <AssigneeAvatar name={assigneeName} />
+                <div className="task-card-people-text">
+                  <span className="task-card-people-name">{assigneeName}</span>
+                  {assignee?.role && (
+                    <span className="task-card-people-role">{assignee.role}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {renderFooter()}
     </article>
   )
 }

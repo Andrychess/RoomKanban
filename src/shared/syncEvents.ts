@@ -6,6 +6,7 @@ export type RoomSyncSource =
   | 'types'
   | 'priorities'
   | 'templates'
+  | 'notes'
   | 'all'
 
 export interface RoomSyncEvent {
@@ -22,6 +23,7 @@ export const ROOM_SYNC_SOURCE_LABELS: Record<RoomSyncSource, string> = {
   types: 'виды задач',
   priorities: 'приоритеты',
   templates: 'шаблоны',
+  notes: 'заметки',
   all: 'все данные'
 }
 

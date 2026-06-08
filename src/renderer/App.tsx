@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Room } from '../shared/types'
 import AppNav from './components/AppNav'
 import RoomTabs from './components/RoomTabs'
+import RoomNotesPanel from './components/RoomNotesPanel'
 import { useNavHistory, type Screen } from './navigation/useNavHistory'
 import WelcomeScreen from './screens/WelcomeScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
@@ -224,6 +225,7 @@ export default function App() {
                   </TooltipWrap>
                 </div>
               </div>
+              <RoomNotesPanel roomPath={room.path} />
             </>
           )}
         </div>

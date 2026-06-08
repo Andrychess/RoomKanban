@@ -21,6 +21,8 @@ export const HINT_SHORT: Record<HintTopicKey, string> = {
   'kanban.columnArchive': 'Убрать все карточки из «Готово» в архив (файлы сохранятся).',
   'kanban.columnCount': 'Слева — по фильтру, справа — всего в колонке.',
   'kanban.columnSort': 'Порядок карточек только в этой колонке.',
+  'kanban.columnCollapse': 'Свернуть колонку — останется только заголовок.',
+  'kanban.columnExpand': 'Развернуть колонку и показать карточки.',
   'kanban.dragHint': 'Перетащите карточку в другую колонку или выберите этап внизу.',
   'filters.search': 'Ищет в названии, описании, имени и роли ответственного.',
   'filters.priority': 'Фильтр по метке срочности.',
@@ -31,6 +33,9 @@ export const HINT_SHORT: Record<HintTopicKey, string> = {
   'taskCard.details': 'Просмотр без блокировки: комментарии и новые файлы.',
   'taskCard.edit': 'Полное редактирование. Если занято — откроется только просмотр.',
   'taskCard.status': 'Смена этапа без открытия карточки.',
+  'taskCard.collapse': 'Свернуть карточку — останется название и этап.',
+  'taskCard.expand': 'Развернуть карточку с описанием и файлами.',
+  'taskEditor.delete': 'Удалить задачу безвозвратно вместе с файлами и историей.',
   'calendar.addDay': 'Создать задачу с выбранным сроком.',
   'calendar.noDue': 'Задачи без даты срока не показываются в сетке месяца.',
   'calendar.overdueLegend': 'Красным — просроченные незавершённые задачи.',
@@ -75,6 +80,8 @@ export const UI_HINTS = {
     columnArchive: HINT_SHORT['kanban.columnArchive'],
     columnCount: HINT_SHORT['kanban.columnCount'],
     columnSort: HINT_SHORT['kanban.columnSort'],
+    columnCollapse: HINT_SHORT['kanban.columnCollapse'],
+    columnExpand: HINT_SHORT['kanban.columnExpand'],
     dragHint: HINT_SHORT['kanban.dragHint']
   },
   filters: {
@@ -87,7 +94,12 @@ export const UI_HINTS = {
   taskCard: {
     details: HINT_SHORT['taskCard.details'],
     edit: HINT_SHORT['taskCard.edit'],
-    status: HINT_SHORT['taskCard.status']
+    status: HINT_SHORT['taskCard.status'],
+    collapse: HINT_SHORT['taskCard.collapse'],
+    expand: HINT_SHORT['taskCard.expand']
+  },
+  taskEditor: {
+    delete: HINT_SHORT['taskEditor.delete']
   },
   calendar: {
     addDay: HINT_SHORT['calendar.addDay'],

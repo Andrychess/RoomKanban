@@ -3,6 +3,7 @@ export {
   daysOverdue,
   dueDateOnly,
   formatDueDate,
+  formatDueDateShort,
   isOverdue,
   mergeDueDateTime,
   splitDueDateTime,

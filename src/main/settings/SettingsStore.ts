@@ -4,6 +4,7 @@ import path from 'path'
 import { computeMachineFingerprint } from '../identity/machineFingerprint'
 import type { ColumnSortId } from '../../shared/columnSort'
 import { defaultColumnSorts } from '../../shared/columnSort'
+import { defaultColumnCollapsed } from '../../shared/kanbanColumnCollapse'
 import type { AppSettings, AppTheme } from '../../shared/types'
 import type { TaskStatus } from '../../shared/taskStatus'
 
@@ -41,6 +42,9 @@ export class SettingsStore {
       }
       if (!this.settings.kanbanColumnSort) {
         this.settings.kanbanColumnSort = {}
+      }
+      if (!this.settings.kanbanColumnCollapsed) {
+        this.settings.kanbanColumnCollapsed = {}
       }
       await this.save()
     } catch {
@@ -148,6 +152,29 @@ export class SettingsStore {
     const saved = this.settings?.kanbanColumnSort?.[normalized]
     if (!saved) return base
     return { ...base, ...saved }
+  }
+
+  getAllColumnCollapsed(roomPath: string): Record<TaskStatus, boolean> {
+    const base = defaultColumnCollapsed()
+    const normalized = path.normalize(roomPath)
+    const saved = this.settings?.kanbanColumnCollapsed?.[normalized]
+    if (!saved) return base
+    return { ...base, ...saved }
+  }
+
+  async setColumnCollapsed(
+    roomPath: string,
+    column: TaskStatus,
+    collapsed: boolean
+  ): Promise<void> {
+    const s = await this.load()
+    const normalized = path.normalize(roomPath)
+    if (!s.kanbanColumnCollapsed) s.kanbanColumnCollapsed = {}
+    if (!s.kanbanColumnCollapsed[normalized]) {
+      s.kanbanColumnCollapsed[normalized] = { ...defaultColumnCollapsed() }
+    }
+    s.kanbanColumnCollapsed[normalized]![column] = collapsed
+    await this.save()
   }
 
   async wasReminderSent(roomPath: string, key: string): Promise<boolean> {

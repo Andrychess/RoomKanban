@@ -7,6 +7,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import KanbanFilters from '../components/KanbanFilters'
 import TooltipWrap from '../components/TooltipWrap'
 import { UI_HINTS } from '../hints/uiHints'
+import { useCollapsedTaskCards } from '../hooks/useCollapsedTaskCards'
+import { useKanbanColumnCollapse } from '../hooks/useKanbanColumnCollapse'
 import { useKanbanColumnSort } from '../hooks/useKanbanColumnSort'
 import { useOverdueCount } from '../hooks/useOverdueCount'
 import TaskCard from '../components/TaskCard'
@@ -41,6 +43,8 @@ export default function KanbanScreen({
   const { filters, setFilters, filteredTasks, hasActiveFilters, resetFilters } =
     useKanbanTaskFilters(tasks, room.pcId, room.state.employees)
   const { sorts, setColumnSort } = useKanbanColumnSort(room.path)
+  const { collapsed, toggleColumnCollapsed, expandColumn } = useKanbanColumnCollapse(room.path)
+  const { isTaskCollapsed, toggleTaskCollapsed } = useCollapsedTaskCards(room.path)
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<TaskEditorMode>('create')
@@ -180,10 +184,12 @@ export default function KanbanScreen({
               ? `${columnTasks.length}/${totalInColumn}`
               : String(columnTasks.length)
 
+          const isCollapsed = collapsed[col.id]
+
           return (
             <section
               key={col.id}
-              className={`kanban-column kanban-column--${col.id} ${dropTarget === col.id ? 'is-drop-target' : ''}`}
+              className={`kanban-column kanban-column--${col.id} ${dropTarget === col.id ? 'is-drop-target' : ''} ${isCollapsed ? 'is-collapsed' : ''}`}
               style={
                 {
                   '--col-accent': theme.accent,
@@ -197,11 +203,31 @@ export default function KanbanScreen({
                 e.preventDefault()
                 setDropTarget(null)
                 const taskId = e.dataTransfer.getData('text/task-id')
-                if (taskId) void changeStatus(col.id, taskId)
+                if (taskId) {
+                  expandColumn(col.id)
+                  void changeStatus(col.id, taskId)
+                }
               }}
             >
               <header className="kanban-column-head">
                 <div className="kanban-column-head-top">
+                  <TooltipWrap
+                    text={
+                      isCollapsed
+                        ? UI_HINTS.kanban.columnExpand
+                        : UI_HINTS.kanban.columnCollapse
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="column-collapse-toggle"
+                      onClick={() => toggleColumnCollapsed(col.id)}
+                      aria-expanded={!isCollapsed}
+                      aria-label={isCollapsed ? 'Развернуть колонку' : 'Свернуть колонку'}
+                    >
+                      <span className="column-collapse-chevron" aria-hidden="true" />
+                    </button>
+                  </TooltipWrap>
                   <h3>{col.title}</h3>
                   <TooltipWrap
                     text={
@@ -223,23 +249,28 @@ export default function KanbanScreen({
                     </button>
                   </TooltipWrap>
                 </div>
-                <ColumnSortSelect
-                  value={sorts[col.id]}
-                  onChange={(sortId) => void setColumnSort(col.id, sortId)}
-                />
-                {col.id === 'done' && doneCount > 0 && (
-                  <TooltipWrap text={UI_HINTS.kanban.columnArchive}>
-                    <button
-                      type="button"
-                      className="column-clear"
-                      onClick={() => setArchiveDoneOpen(true)}
-                    >
-                      В архив
-                    </button>
-                  </TooltipWrap>
+                {!isCollapsed && (
+                  <>
+                    <ColumnSortSelect
+                      value={sorts[col.id]}
+                      onChange={(sortId) => void setColumnSort(col.id, sortId)}
+                    />
+                    {col.id === 'done' && doneCount > 0 && (
+                      <TooltipWrap text={UI_HINTS.kanban.columnArchive}>
+                        <button
+                          type="button"
+                          className="column-clear"
+                          onClick={() => setArchiveDoneOpen(true)}
+                        >
+                          В архив
+                        </button>
+                      </TooltipWrap>
+                    )}
+                  </>
                 )}
               </header>
 
+              {!isCollapsed && (
               <div className="kanban-column-body">
                 {columnTasks.length === 0 && (
                   <p className="kanban-column-empty">
@@ -255,14 +286,17 @@ export default function KanbanScreen({
                     taskTypes={taskTypes}
                     taskPriorities={taskPriorities}
                     assignee={room.state.employees[task.assignee_pc]}
-                      columnAccent={theme.accent}
+                    columnAccent={theme.accent}
+                    isCollapsed={isTaskCollapsed(task.id)}
+                    onToggleCollapse={() => toggleTaskCollapsed(task.id)}
                     onViewDetails={openViewDetails}
                     onEdit={openEdit}
-                      onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
+                    onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
                     onStatusChange={(id, status) => void changeStatus(status, id)}
                   />
                 ))}
               </div>
+              )}
             </section>
           )
         })}

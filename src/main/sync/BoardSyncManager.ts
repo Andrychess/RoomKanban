@@ -710,28 +710,34 @@ export class BoardSyncManager {
     })
   }
 
-  async deleteArchivedTask(taskId: string): Promise<void> {
+  private async removeTaskPermanently(task: Task, taskId: string): Promise<void> {
+    for (const file of task.source_files) {
+      await this.deleteFileEntry(file)
+    }
+    for (const file of task.completed_files) {
+      await this.deleteFileEntry(file)
+    }
+    await this.removeAllTaskDocs(task.id)
+    await this.deleteTaskFile(task.id)
+    if (this.history) {
+      await this.history.deleteForTask(taskId)
+    }
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
     return this.withBoardMutation(async (tasks) => {
       const task = tasks.find((t) => t.id === taskId)
       if (!task) throw new Error('Задача не найдена')
-      if (!task.archived_at) {
-        throw new Error('Удалять можно только задачи из архива')
-      }
 
-      for (const file of task.source_files) {
-        await this.deleteFileEntry(file)
-      }
-      for (const file of task.completed_files) {
-        await this.deleteFileEntry(file)
-      }
-      await this.removeAllTaskDocs(task.id)
-      await this.deleteTaskFile(task.id)
-      if (this.history) {
-        await this.history.deleteForTask(taskId)
-      }
+      await this.removeTaskPermanently(task, taskId)
       this.emitActiveFromCache()
       this.externalSync.notifyExternal(false)
     })
+  }
+
+  /** @deprecated используйте deleteTask */
+  async deleteArchivedTask(taskId: string): Promise<void> {
+    return this.deleteTask(taskId)
   }
 
   /** @deprecated используйте archiveDoneTasks */

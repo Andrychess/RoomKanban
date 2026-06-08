@@ -19,6 +19,7 @@ import { SettingsStore } from '../settings/SettingsStore'
 import { TaskPrioritiesStore } from '../sync/TaskPrioritiesStore'
 import { TaskTypesStore } from '../sync/TaskTypesStore'
 import { TaskTemplatesStore } from '../sync/TaskTemplatesStore'
+import { NotesStore } from '../sync/NotesStore'
 
 export class RoomError extends Error {
   constructor(
@@ -268,6 +269,7 @@ export class RoomManager {
     await TaskTypesStore.createInitialFile(normalized)
     await TaskPrioritiesStore.createInitialFile(normalized)
     await TaskTemplatesStore.createInitialFile(normalized)
+    await NotesStore.createInitialFile(normalized)
 
     await this.settings.setEmployeeBinding(normalized, employeeKey)
 

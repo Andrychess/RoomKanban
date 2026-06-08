@@ -73,6 +73,17 @@ export function formatDueDate(value: string | null | undefined): string {
   return `${dateStr}, ${timeStr}`
 }
 
+/** Короткий формат для свёрнутой карточки на канбане. */
+export function formatDueDateShort(value: string | null | undefined): string {
+  const d = parseDueDate(value)
+  if (!d || !value?.trim()) return '—'
+  const day = d.getDate()
+  const month = d.toLocaleDateString('ru-RU', { month: 'short' }).replace(/\.$/, '')
+  if (!value.includes('T')) return `${day} ${month}`
+  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  return `${day} ${month} · ${time}`
+}
+
 export function isOverdue(
   dueDate: string | null | undefined,
   status: Task['status'] | string

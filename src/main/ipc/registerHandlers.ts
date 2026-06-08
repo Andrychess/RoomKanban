@@ -11,6 +11,7 @@ import { TaskPrioritiesStore } from '../sync/TaskPrioritiesStore'
 import { TaskTemplatesStore } from '../sync/TaskTemplatesStore'
 import { ReminderSettingsStore } from '../sync/ReminderSettingsStore'
 import { ExchangeStore } from '../sync/ExchangeStore'
+import { NotesStore } from '../sync/NotesStore'
 import { refreshRoomSync } from '../sync/refreshRoomSync'
 import { TaskTypesStore } from '../sync/TaskTypesStore'
 import type { ColumnSortId } from '../../shared/columnSort'
@@ -19,6 +20,7 @@ import type {
   EnterRoomCredentials,
   ReminderSettings,
   Room,
+  RoomNote,
   Task,
   TaskFileKind,
   TaskHistoryEntry,
@@ -41,6 +43,7 @@ let taskTemplatesStore: TaskTemplatesStore | null = null
 let reminderSettingsStore: ReminderSettingsStore | null = null
 let reminderScheduler: ReminderScheduler | null = null
 let exchangeStore: ExchangeStore | null = null
+let notesStore: NotesStore | null = null
 let settingsStore: SettingsStore
 
 function getWindow(): BrowserWindow | null {
@@ -66,6 +69,7 @@ async function startRoomSync(room: Room, roomManager: RoomManager): Promise<void
   await taskPrioritiesStore?.stop()
   await taskTemplatesStore?.stop()
   await exchangeStore?.stop()
+  await notesStore?.stop()
   reminderScheduler?.stop()
 
   taskTypesStore = new TaskTypesStore(room.path)
@@ -111,6 +115,9 @@ async function startRoomSync(room: Room, roomManager: RoomManager): Promise<void
 
   exchangeStore = new ExchangeStore(room.path)
   await exchangeStore.start()
+
+  notesStore = new NotesStore(room.path)
+  await notesStore.start()
 }
 
 export function registerHandlers(
@@ -266,6 +273,18 @@ export function registerHandlers(
     }
   )
 
+  ipcMain.handle('get-column-collapsed', (_e, roomPath: string) => {
+    return settings.getAllColumnCollapsed(roomPath)
+  })
+
+  ipcMain.handle(
+    'set-column-collapsed',
+    async (_e, roomPath: string, column: TaskStatus, collapsed: boolean) => {
+      await settings.setColumnCollapsed(roomPath, column, collapsed)
+      return settings.getAllColumnCollapsed(roomPath)
+    }
+  )
+
   ipcMain.handle('add-employee', async (_e, name: string, role: string) => {
     try {
       return await roomManager.addEmployee(name, role)
@@ -400,6 +419,7 @@ export function registerHandlers(
     return refreshRoomSync({
       boardSync,
       exchangeStore,
+      notesStore,
       taskTypesStore,
       taskPrioritiesStore,
       taskTemplatesStore
@@ -463,11 +483,23 @@ export function registerHandlers(
     return boardSync.restoreArchivedTask(taskId)
   })
 
+  ipcMain.handle('delete-task', async (_e, taskId: string) => {
+    if (!boardSync) throw new Error('Комната не открыта')
+    assertTaskId(taskId)
+    try {
+      await taskLockStore?.clearLock(taskId)
+      await boardSync.deleteTask(taskId)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
+  })
+
   ipcMain.handle('delete-archived-task', async (_e, taskId: string) => {
     if (!boardSync) throw new Error('Комната не открыта')
     assertTaskId(taskId)
     try {
-      await boardSync.deleteArchivedTask(taskId)
+      await taskLockStore?.clearLock(taskId)
+      await boardSync.deleteTask(taskId)
     } catch (err) {
       throw new Error(toErrorMessage(err))
     }
@@ -542,6 +574,55 @@ export function registerHandlers(
       }
       const unsubscribe = taskTemplatesStore!.onTemplatesChanged(listener)
       void taskTemplatesStore!.getTemplates().then(listener)
+      return unsubscribe
+    })
+  })
+
+  ipcMain.handle('get-room-notes', async () => {
+    if (!notesStore) return []
+    return notesStore.getNotes()
+  })
+
+  ipcMain.handle('add-room-note', async (_e, title: string, text: string) => {
+    const room = requireOpenRoom()
+    if (!notesStore) throw new Error('Комната не открыта')
+    try {
+      return await notesStore.addNote(title, text, room.pcId)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
+  })
+
+  ipcMain.handle('update-room-note', async (_e, noteId: string, title: string, text: string) => {
+    requireOpenRoom()
+    if (!notesStore) throw new Error('Комната не открыта')
+    try {
+      return await notesStore.updateNote(noteId, title, text)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
+  })
+
+  ipcMain.handle('delete-room-note', async (_e, noteId: string) => {
+    requireOpenRoom()
+    if (!notesStore) throw new Error('Комната не открыта')
+    try {
+      await notesStore.deleteNote(noteId)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
+  })
+
+  ipcMain.handle('subscribe-room-notes', (event) => {
+    if (!notesStore) return
+    setWindowSubscription(event.sender, 'room-notes', () => {
+      const listener = (notes: RoomNote[]) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('room-notes-updated', notes)
+        }
+      }
+      const unsubscribe = notesStore!.onNotesChanged(listener)
+      void notesStore!.getNotes().then(listener)
       return unsubscribe
     })
   })
@@ -639,6 +720,8 @@ export async function closeRoomFully(roomManager: RoomManager): Promise<void> {
   reminderScheduler = null
   await exchangeStore?.stop()
   exchangeStore = null
+  await notesStore?.stop()
+  notesStore = null
   await roomManager.closeRoom()
 }
 
