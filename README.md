@@ -27,7 +27,7 @@ npm run dist
 
 Перед сборкой **версия увеличивается автоматически** (patch: `0.1.0` → `0.1.1`). Номер берётся из `package.json` и попадает в имя установщика и в приложение.
 
-Результат: `release/RoomKanban Setup X.Y.Z.exe`. Иконка: `build/icon.png` (исходник — `assets/icon.png`).
+Результат: `release/X.Y.Z/RoomKanban Setup X.Y.Z.exe` (например `release/0.1.3/RoomKanban Setup 0.1.3.exe`).
 
 После сборки закоммитьте обновлённый `package.json`.
 
