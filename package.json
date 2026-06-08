@@ -13,6 +13,7 @@
     "dist:dir": "node scripts/bump-version.mjs && node scripts/clean-release.mjs && npm run build && electron-builder --win --dir --config electron-builder.cjs",
     "dist:publish": "node scripts/bump-version.mjs && node scripts/clean-release.mjs && npm run build && electron-builder --win --publish always --config electron-builder.cjs",
     "release:publish": "node scripts/bump-version.mjs --no-bump && node scripts/clean-release.mjs && npm run build && electron-builder --win --publish always --config electron-builder.cjs",
+    "ci:release": "npm run build && electron-builder --win --publish always --config electron-builder.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "build": {
@@ -52,10 +53,14 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
+      "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "RoomKanban"
+      "shortcutName": "RoomKanban",
+      "uninstallDisplayName": "RoomKanban",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
     },
     "publish": {
       "provider": "github",
