@@ -34,6 +34,7 @@ npm run dist
 | `npm run dev` | Разработка |
 | `npm run build` | Сборка в `out/` |
 | `npm run dist` | Установщик `.exe` |
+| `npm run dist:publish` | Сборка + публикация в GitHub Releases |
 | `npm run typecheck` | Проверка TypeScript |
 
 Подробности — в [docs/TECHNICAL.md](docs/TECHNICAL.md).

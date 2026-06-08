@@ -16,6 +16,7 @@ import ChiefDashboardScreen from './screens/ChiefDashboardScreen'
 import ArchiveScreen from './screens/ArchiveScreen'
 import ExchangeScreen from './screens/ExchangeScreen'
 import ThemeToggle from './components/ThemeToggle'
+import AppUpdatePanel from './components/AppUpdatePanel'
 import TooltipWrap from './components/TooltipWrap'
 import { useHelp } from './context/HelpContext'
 import { USER_HELP_ANCHORS, type UserHelpAnchorId } from '../shared/helpAnchors'
@@ -25,6 +26,7 @@ import { useAppTheme } from './hooks/useAppTheme'
 import { useSyncNotifications } from './hooks/useSyncNotifications'
 import { useOverdueCount } from './hooks/useOverdueCount'
 import { useRoomTasks } from './hooks/useRoomTasks'
+import { useAppUpdate } from './hooks/useAppUpdate'
 
 const MENU_SCREEN_MAP: Record<string, Screen> = {
   welcome: 'welcome',
@@ -64,6 +66,7 @@ export default function App() {
   const overdueCount = useOverdueCount(roomTasks)
   const { toast: syncToast, dismissToast } = useSyncNotifications(inRoomView)
   const [syncRefreshing, setSyncRefreshing] = useState(false)
+  const { status: appUpdateStatus, panelOpen, startUpdate, closePanel, openPanel } = useAppUpdate()
 
   const currentEmployeeName =
     room && room.state.employees[room.pcId]
@@ -164,6 +167,15 @@ export default function App() {
             >
               Справка
             </button>
+            <AppUpdatePanel
+              status={appUpdateStatus}
+              open={panelOpen}
+              onClose={closePanel}
+              onUpdate={() => {
+                openPanel()
+                startUpdate()
+              }}
+            />
             <ThemeToggle theme={theme} onToggle={() => void toggleTheme()} />
           </div>
           {inRoomView && room && (

@@ -24,6 +24,7 @@ import type {
 import type { TaskStatus } from '../shared/taskStatus'
 import type { DocumentationBundle } from '../shared/documentation'
 import type { RoomSyncEvent, UpdateTaskResult } from '../shared/syncEvents'
+import type { AppUpdateStatus } from '../shared/appUpdate'
 
 export interface RoomKanbanApi {
   getUserDocumentation: () => Promise<DocumentationBundle>
@@ -117,6 +118,12 @@ export interface RoomKanbanApi {
   onOpenHelp: (callback: (anchor: string | null) => void) => () => void
   onRoomAutoOpened: (callback: (room: Room) => void) => () => void
   onRoomClosed: (callback: () => void) => () => void
+  getAppUpdateStatus: () => Promise<AppUpdateStatus>
+  isAppUpdateEnabled: () => Promise<boolean>
+  startAppUpdate: () => Promise<AppUpdateStatus>
+  installAppUpdate: () => Promise<void>
+  onAppUpdateStatus: (callback: (status: AppUpdateStatus) => void) => () => void
+  onOpenAppUpdate: (callback: () => void) => () => void
 }
 
 const api: RoomKanbanApi = {
@@ -266,6 +273,20 @@ const api: RoomKanbanApi = {
     const handler = () => callback()
     ipcRenderer.on('room-closed', handler)
     return () => ipcRenderer.removeListener('room-closed', handler)
+  },
+  getAppUpdateStatus: () => ipcRenderer.invoke('get-app-update-status'),
+  isAppUpdateEnabled: () => ipcRenderer.invoke('is-app-update-enabled'),
+  startAppUpdate: () => ipcRenderer.invoke('start-app-update'),
+  installAppUpdate: () => ipcRenderer.invoke('install-app-update'),
+  onAppUpdateStatus: (callback) => {
+    const handler = (_: unknown, status: AppUpdateStatus) => callback(status)
+    ipcRenderer.on('app-update-status', handler)
+    return () => ipcRenderer.removeListener('app-update-status', handler)
+  },
+  onOpenAppUpdate: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('open-app-update', handler)
+    return () => ipcRenderer.removeListener('open-app-update', handler)
   }
 }
 

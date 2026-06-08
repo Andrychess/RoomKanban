@@ -4,11 +4,14 @@ import { resolveAppIconPath } from './appIcon'
 import { SettingsStore } from './settings/SettingsStore'
 import { RoomManager } from './room/RoomManager'
 import { autoOpenRoom, closeRoomFully, registerHandlers } from './ipc/registerHandlers'
+import { AppUpdater } from './updates/AppUpdater'
+import { registerUpdateHandlers } from './updates/registerUpdateHandlers'
 
 const isDev = !app.isPackaged
 
 const settings = new SettingsStore()
 const roomManager = new RoomManager(settings)
+const appUpdater = new AppUpdater()
 
 let mainWindow: BrowserWindow | null = null
 
@@ -80,6 +83,11 @@ function buildMenu(): void {
           label: 'Документация…',
           accelerator: 'F1',
           click: () => mainWindow?.webContents.send('open-help', null)
+        },
+        { type: 'separator' },
+        {
+          label: 'Обновить приложение…',
+          click: () => mainWindow?.webContents.send('open-app-update')
         }
       ]
     },
@@ -134,9 +142,17 @@ app.whenReady().then(async () => {
   }
 
   await settings.load()
+  appUpdater.init()
   registerHandlers(roomManager, settings)
+  registerUpdateHandlers(appUpdater)
   buildMenu()
   createWindow()
+
+  if (app.isPackaged) {
+    setTimeout(() => {
+      void appUpdater.checkOnStartup()
+    }, 4000)
+  }
 
   const room = await autoOpenRoom(roomManager)
   if (room && mainWindow) {

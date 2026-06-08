@@ -124,8 +124,33 @@ npm run preview  # Electron с out/
 |---------|-----------|
 | `npm run dist` | `build` + `electron-builder --win` → `release/RoomKanban Setup 0.1.0.exe` |
 | `npm run dist:dir` | Распакованная папка `release/win-unpacked/` (портативный запуск) |
+| `npm run dist:publish` | Сборка + публикация в GitHub Releases (нужен `GH_TOKEN`) |
 
 **Данные комнаты не входят в установщик** — только бинарник приложения. Резервное копирование = копия всей папки комнаты.
+
+### Автообновление (GitHub Releases)
+
+| Компонент | Реализация |
+|-----------|------------|
+| Библиотека | `electron-updater` в main-процессе (`src/main/updates/AppUpdater.ts`) |
+| Источник | GitHub Releases репозитория `Andrychess/RoomKanban` (`publish` в `package.json`) |
+| UI | Кнопка **Обновить** в шапке + меню **Справка → Обновить приложение…** |
+| Проверка при старте | Через ~4 с после запуска (только packaged-сборка) |
+
+**Публикация новой версии для пользователей:**
+
+1. Поднять версию в `package.json` (например `0.2.0`).
+2. Закоммитить и создать тег: `git tag v0.2.0 && git push origin v0.2.0`
+3. GitHub Actions (`.github/workflows/release.yml`) соберёт `.exe` и опубликует Release с `latest.yml` для автообновления.
+
+Локальная публикация (без Actions):
+
+```bash
+set GH_TOKEN=ghp_...
+npm run dist:publish
+```
+
+Установленное приложение подтянет обновление по кнопке **Обновить**; в режиме `npm run dev` автообновление отключено.
 
 ### extraResources и справка в установщике
 

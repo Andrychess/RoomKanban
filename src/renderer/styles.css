@@ -2281,7 +2281,118 @@ body {
 }
 
 .theme-toggle {
+  margin-left: 0;
+}
+
+.app-update-trigger {
   margin-left: auto;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-update-trigger--ready {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.app-update-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 25%, transparent);
+  flex-shrink: 0;
+}
+
+.app-update-version {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.app-update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
+.app-update-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1201;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  padding: 20px 22px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+}
+
+.app-update-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.app-update-panel-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.app-update-panel-lead {
+  margin: 0 0 12px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.app-update-panel-meta {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.app-update-progress {
+  height: 8px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.app-update-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #22c55e));
+  transition: width 0.2s ease;
+}
+
+.app-update-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.app-update-main-btn {
+  flex: 1 1 auto;
+  min-width: 180px;
+}
+
+.app-update-main-btn--ready {
+  background: #22c55e;
+  border-color: #16a34a;
+}
+
+.app-update-main-btn--ready:hover {
+  background: #16a34a;
 }
 
 .brand-row h1 {
