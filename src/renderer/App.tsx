@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Room } from '../shared/types'
 import AppNav from './components/AppNav'
 import RoomTabs from './components/RoomTabs'
-import RoomNotesPanel from './components/RoomNotesPanel'
+import RoomLabelsSettings from './components/RoomLabelsSettings'
 import { useNavHistory, type Screen } from './navigation/useNavHistory'
 import WelcomeScreen from './screens/WelcomeScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import CreateRoomScreen from './screens/CreateRoomScreen'
 import JoinRoomScreen from './screens/JoinRoomScreen'
 import KanbanScreen from './screens/KanbanScreen'
+import EmployeeKanbanScreen from './screens/EmployeeKanbanScreen'
 import CalendarScreen from './screens/CalendarScreen'
 import TeamScreen from './screens/TeamScreen'
 import OverdueReportScreen from './screens/OverdueReportScreen'
@@ -27,12 +28,15 @@ import { useSyncNotifications } from './hooks/useSyncNotifications'
 import { useOverdueCount } from './hooks/useOverdueCount'
 import { useRoomTasks } from './hooks/useRoomTasks'
 import { useAppUpdate } from './hooks/useAppUpdate'
+import { useTaskTypes } from './hooks/useTaskTypes'
+import { SEED_TEST_TASK_COUNT } from '../shared/seedTestTasks'
 
 const MENU_SCREEN_MAP: Record<string, Screen> = {
   welcome: 'welcome',
   create: 'create',
   join: 'join',
   calendar: 'calendar',
+  kanbanByEmployee: 'kanbanByEmployee',
   team: 'team',
   overdue: 'overdue',
   dashboard: 'dashboard',
@@ -47,10 +51,12 @@ export default function App() {
   const [room, setRoom] = useState<Room | null>(null)
   const [joinFolder, setJoinFolder] = useState<string | null>(null)
   const [createFolder, setCreateFolder] = useState<string | null>(null)
+  const [taskTypesOpen, setTaskTypesOpen] = useState(false)
 
   const inRoomView =
     room !== null &&
     (screen === 'kanban' ||
+      screen === 'kanbanByEmployee' ||
       screen === 'calendar' ||
       screen === 'team' ||
       screen === 'overdue' ||
@@ -68,6 +74,7 @@ export default function App() {
   const [syncRefreshing, setSyncRefreshing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
   const { status: appUpdateStatus, panelOpen, startUpdate, closePanel, openPanel } = useAppUpdate()
+  const { types: taskTypes, refresh: refreshTaskTypes } = useTaskTypes()
 
   const currentEmployeeName =
     room && room.state.employees[room.pcId]
@@ -91,6 +98,23 @@ export default function App() {
     navigate('welcome', { reset: true })
   }, [navigate])
 
+  const handleSeedTestTasks = useCallback(async () => {
+    if (
+      !window.confirm(
+        `Создать ${SEED_TEST_TASK_COUNT} тестовых задач во всех колонках канбана?`
+      )
+    ) {
+      return
+    }
+    try {
+      const { count } = await window.api.seedTestTasks()
+      refreshRoomTasks()
+      alert(`Добавлено задач: ${count}`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось создать тестовые задачи')
+    }
+  }, [refreshRoomTasks])
+
   useEffect(() => {
     void window.api.getCurrentRoom().then((r) => {
       if (r) {
@@ -102,6 +126,7 @@ export default function App() {
     const unsubNav = window.api.onNavigate((s) => {
       if (
         s === 'calendar' ||
+        s === 'kanbanByEmployee' ||
         s === 'team' ||
         s === 'overdue' ||
         s === 'dashboard' ||
@@ -155,64 +180,42 @@ export default function App() {
       <header className="app-header">
         <div className="header-left">
           <div className="brand-row">
-            <h1 className="app-brand">
-              <img src="./icon.png" alt="" className="app-brand-icon" width={28} height={28} />
-              RoomKanban
-            </h1>
-            <AppNav canBack={canBack && !inRoomView} onBack={back} />
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm doc-help-btn"
-              onClick={() => openHelp(USER_HELP_ANCHORS.hints)}
-              title="Справка по приложению"
-            >
-              Справка
-            </button>
-            <AppUpdatePanel
-              status={appUpdateStatus}
-              open={panelOpen}
-              onClose={closePanel}
-              onUpdate={() => {
-                openPanel()
-                startUpdate()
-              }}
-            />
-            <ThemeToggle theme={theme} onToggle={() => void toggleTheme()} />
-          </div>
-          {inRoomView && room && (
-            <>
-              <RoomTabs
-                active={
-                  screen === 'calendar'
-                    ? 'calendar'
-                    : screen === 'team'
-                      ? 'team'
-                      : screen === 'overdue'
-                        ? 'overdue'
-                        : screen === 'dashboard'
-                          ? 'dashboard'
-                          : screen === 'archive'
-                            ? 'archive'
-                            : screen === 'exchange'
-                              ? 'exchange'
-                              : 'kanban'
-                }
-                isChief={room.isChief}
-                overdueCount={overdueCount}
-                onChange={(s) => navigate(s, { replace: true })}
-              />
-              <div className="room-bar">
-                <div className="room-bar-info">
-                  <strong>{room.state.room_name}</strong>
+            <div className="brand-row-start">
+              <h1 className="app-brand">
+                <img src="./icon.png" alt="" className="app-brand-icon" width={28} height={28} />
+                RoomKanban
+              </h1>
+              <AppNav canBack={canBack && !inRoomView} onBack={back} />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm doc-help-btn"
+                onClick={() => openHelp(USER_HELP_ANCHORS.hints)}
+                title="Справка по приложению"
+              >
+                Справка
+              </button>
+              {inRoomView && room && (
+                <div className="header-room-info">
+                  <span className="header-room-text">{room.state.room_name}</span>
                   {currentEmployeeName && (
-                    <span className="room-bar-user">Вы: {currentEmployeeName}</span>
+                    <span className="header-room-text">Вы: {currentEmployeeName}</span>
+                  )}
+                  {syncError && (
+                    <span className="header-room-error" role="alert">
+                      {syncError}
+                    </span>
                   )}
                 </div>
-                <div className="room-bar-actions">
+              )}
+            </div>
+
+            <div className="brand-row-end">
+              {inRoomView && room && (
+                <div className="header-room-actions">
                   <TooltipWrap text={UI_HINTS.roomBar.sync}>
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm"
+                      className="btn btn-sm header-action-btn"
                       disabled={syncRefreshing}
                       onClick={() => {
                         setSyncRefreshing(true)
@@ -230,15 +233,10 @@ export default function App() {
                       {syncRefreshing ? 'Обновление…' : 'Обновить синхронизацию'}
                     </button>
                   </TooltipWrap>
-                  {syncError && (
-                    <span className="room-bar-sync-error" role="alert">
-                      {syncError}
-                    </span>
-                  )}
                   <TooltipWrap text={UI_HINTS.roomBar.leave}>
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm"
+                      className="btn btn-sm header-action-btn"
                       onClick={async () => {
                         await window.api.closeRoom()
                         goWelcome()
@@ -248,15 +246,53 @@ export default function App() {
                     </button>
                   </TooltipWrap>
                 </div>
-              </div>
-              <RoomNotesPanel roomPath={room.path} />
+              )}
+              <AppUpdatePanel
+                status={appUpdateStatus}
+                open={panelOpen}
+                onClose={closePanel}
+                onUpdate={() => {
+                  openPanel()
+                  startUpdate()
+                }}
+              />
+              <ThemeToggle theme={theme} onToggle={() => void toggleTheme()} />
+            </div>
+          </div>
+          {inRoomView && room && (
+            <>
+              <RoomTabs
+                active={
+                  screen === 'calendar'
+                    ? 'calendar'
+                    : screen === 'kanbanByEmployee'
+                      ? 'kanbanByEmployee'
+                    : screen === 'team'
+                      ? 'team'
+                      : screen === 'overdue'
+                        ? 'overdue'
+                        : screen === 'dashboard'
+                          ? 'dashboard'
+                          : screen === 'archive'
+                            ? 'archive'
+                            : screen === 'exchange'
+                              ? 'exchange'
+                              : 'kanban'
+                }
+                isChief={room.isChief}
+                roomPath={room.path}
+                overdueCount={overdueCount}
+                onChange={(s) => navigate(s, { replace: true })}
+                onOpenTaskTypes={room.isChief ? () => setTaskTypesOpen(true) : undefined}
+                onSeedTestTasks={room.isChief ? () => void handleSeedTestTasks() : undefined}
+              />
             </>
           )}
         </div>
       </header>
 
       <main
-        className={`app-main ${inRoomView ? 'room-view' : ''} ${screen === 'kanban' ? 'kanban' : ''} ${screen === 'calendar' ? 'calendar' : ''} ${screen === 'team' ? 'team' : ''} ${screen === 'overdue' ? 'overdue' : ''} ${screen === 'dashboard' ? 'dashboard' : ''} ${screen === 'archive' ? 'archive' : ''} ${screen === 'exchange' ? 'exchange' : ''}`}
+        className={`app-main ${inRoomView ? 'room-view' : ''} ${screen === 'kanban' || screen === 'kanbanByEmployee' ? 'kanban' : ''} ${screen === 'calendar' ? 'calendar' : ''} ${screen === 'team' ? 'team' : ''} ${screen === 'overdue' ? 'overdue' : ''} ${screen === 'dashboard' ? 'dashboard' : ''} ${screen === 'archive' ? 'archive' : ''} ${screen === 'exchange' ? 'exchange' : ''}`}
       >
         {screen === 'welcome' && (
           <WelcomeScreen
@@ -297,10 +333,14 @@ export default function App() {
             tasks={roomTasks}
             onTasksChange={refreshRoomTasks}
             tasksLoadError={roomTasksLoadError}
-            overdueCount={overdueCount}
-            onOpenOverdue={
-              room.isChief ? () => navigate('overdue', { replace: true }) : undefined
-            }
+          />
+        )}
+        {screen === 'kanbanByEmployee' && room && (
+          <EmployeeKanbanScreen
+            room={room}
+            tasks={roomTasks}
+            onTasksChange={refreshRoomTasks}
+            tasksLoadError={roomTasksLoadError}
           />
         )}
         {screen === 'calendar' && room && (
@@ -324,6 +364,17 @@ export default function App() {
         )}
         {screen === 'exchange' && room && <ExchangeScreen room={room} />}
       </main>
+
+      {taskTypesOpen && room?.isChief && (
+        <RoomLabelsSettings
+          types={taskTypes}
+          onClose={() => setTaskTypesOpen(false)}
+          onSaved={() => {
+            refreshTaskTypes()
+            refreshRoomTasks()
+          }}
+        />
+      )}
     </div>
   )
 }

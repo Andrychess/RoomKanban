@@ -1,28 +1,25 @@
 import { useEffect, useState } from 'react'
 import type {
-  ChecklistItem,
   CreateTaskInput,
   RoomState,
   Task,
-  TaskPriority,
   TaskType,
   UpdateTaskInput
 } from '../../shared/types'
 import { STATUS_LABELS_FULL, TASK_STATUSES } from '../../shared/taskStatus'
 import { DEFAULT_PRIORITY_ID } from '../../shared/defaultTaskPriorities'
 import { DEFAULT_TYPE_ID } from '../../shared/defaultTaskTypes'
-import TaskChecklist from './TaskChecklist'
-import TaskComments from './TaskComments'
 import TaskDetailView from './TaskDetailView'
 import TaskFileGroupEditor, { type PendingFile } from './TaskFileGroupEditor'
-import TaskHistoryPanel from './TaskHistoryPanel'
+import TaskHistoryDialog from './TaskHistoryDialog'
 import { mergeDueDateTime, splitDueDateTime } from '../utils/dates'
-import TaskTemplatePicker, { type TemplateApplyValues } from './TaskTemplatePicker'
 import TaskConflictDialog from './TaskConflictDialog'
 import ConfirmDialog from './ConfirmDialog'
 import TooltipWrap from './TooltipWrap'
+import { TaskMetaRowEditor } from './TaskMetaRow'
+import AutoResizeTextarea from './AutoResizeTextarea'
 import { UI_HINTS } from '../hints/uiHints'
-import { useTaskTemplates } from '../hooks/useTaskTemplates'
+import { isTaskOverdue } from '../../shared/overdue'
 
 export type TaskEditorMode = 'create' | 'edit' | 'view'
 
@@ -30,11 +27,11 @@ interface Props {
   roomState: RoomState
   currentPcId: string
   taskTypes: TaskType[]
-  taskPriorities: TaskPriority[]
   task: Task | null
   mode?: TaskEditorMode
   defaultStatus: Task['status']
   defaultDueDate?: string | null
+  defaultAssigneePc?: string
   readOnlyArchived?: boolean
   onClose: () => void
   onSaved: () => void
@@ -51,11 +48,11 @@ export default function TaskEditor({
   roomState,
   currentPcId,
   taskTypes,
-  taskPriorities,
   task,
   mode: modeProp,
   defaultStatus,
   defaultDueDate = null,
+  defaultAssigneePc,
   readOnlyArchived = false,
   onClose,
   onSaved
@@ -64,22 +61,19 @@ export default function TaskEditor({
   const isCreate = mode === 'create'
   const isView = mode === 'view'
   const isEdit = mode === 'edit'
-  const { templates } = useTaskTemplates()
   const employees = roomState.employees
   const pcIds = Object.keys(employees)
 
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
-  const [assigneePc, setAssigneePc] = useState(task?.assignee_pc ?? currentPcId)
-  const [typeId, setTypeId] = useState(task?.type_id ?? taskTypes[0]?.id ?? DEFAULT_TYPE_ID)
-  const [priorityId, setPriorityId] = useState(
-    task?.priority_id ?? taskPriorities[0]?.id ?? DEFAULT_PRIORITY_ID
+  const [assigneePc, setAssigneePc] = useState(
+    task?.assignee_pc ?? defaultAssigneePc ?? currentPcId
   )
+  const [typeId, setTypeId] = useState(task?.type_id ?? taskTypes[0]?.id ?? DEFAULT_TYPE_ID)
   const [status, setStatus] = useState<Task['status']>(task?.status ?? defaultStatus)
   const initialDue = splitDueDateTime(task?.due_date ?? defaultDueDate ?? null)
   const [dueDatePart, setDueDatePart] = useState(initialDue.date)
   const [dueTimePart, setDueTimePart] = useState(initialDue.time)
-  const [checklist, setChecklist] = useState<ChecklistItem[]>(task?.checklist ?? [])
   const [liveTask, setLiveTask] = useState<Task | null>(task)
 
   const [pendingSource, setPendingSource] = useState<PendingFile[]>([])
@@ -94,6 +88,7 @@ export default function TaskEditor({
   const [lockBlockedBy, setLockBlockedBy] = useState<string | null>(null)
   const [lockReady, setLockReady] = useState(!task)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
@@ -146,19 +141,10 @@ export default function TaskEditor({
   useEffect(() => {
     if (!task && !assigneePc && pcIds.length > 0) setAssigneePc(currentPcId)
     if (!typeId && taskTypes[0]) setTypeId(taskTypes[0].id)
-    if (!priorityId && taskPriorities[0]) setPriorityId(taskPriorities[0].id)
-  }, [task, assigneePc, pcIds, currentPcId, typeId, taskTypes, priorityId, taskPriorities])
+  }, [task, assigneePc, pcIds, currentPcId, typeId, taskTypes])
 
-  function applyTemplate(values: TemplateApplyValues) {
-    setTitle(values.title)
-    setDescription(values.description)
-    setTypeId(values.typeId)
-    setPriorityId(values.priorityId)
-    setStatus(values.status)
-    const tplDue = splitDueDateTime(values.dueDate || null)
-    setDueDatePart(tplDue.date)
-    setDueTimePart(tplDue.time)
-    setChecklist(values.checklist)
+  function resolvePriorityId(): string {
+    return liveTask?.priority_id ?? task?.priority_id ?? DEFAULT_PRIORITY_ID
   }
 
   async function pickFiles(target: 'source' | 'completed') {
@@ -177,12 +163,10 @@ export default function TaskEditor({
     setDescription(remote.description)
     setAssigneePc(remote.assignee_pc)
     setTypeId(remote.type_id)
-    setPriorityId(remote.priority_id)
     setStatus(remote.status)
     const remoteDue = splitDueDateTime(remote.due_date)
     setDueDatePart(remoteDue.date)
     setDueTimePart(remoteDue.time)
-    setChecklist(remote.checklist)
     setLiveTask(remote)
     setClientBaseUpdatedAt(remote.updated_at)
     setPendingSource([])
@@ -212,7 +196,6 @@ export default function TaskEditor({
       priority_id: base.priority_id,
       due_date: base.due_date,
       status: base.status,
-      checklist: base.checklist,
       client_base_updated_at: clientBaseUpdatedAt,
       add_source_files: pendingSource.map((f) => f.path),
       add_completed_files: pendingCompleted.map((f) => f.path),
@@ -242,10 +225,9 @@ export default function TaskEditor({
       description,
       assignee_pc: assigneePc,
       type_id: typeId,
-      priority_id: priorityId,
+      priority_id: resolvePriorityId(),
       due_date: buildDueValue(),
       status,
-      checklist,
       client_base_updated_at: clientBaseUpdatedAt,
       force_overwrite: forceOverwrite || undefined,
       add_source_files: pendingSource.map((f) => f.path),
@@ -279,10 +261,6 @@ export default function TaskEditor({
       setError('Выберите вид задачи')
       return
     }
-    if (!priorityId) {
-      setError('Выберите приоритет')
-      return
-    }
 
     setLoading(true)
     setError('')
@@ -296,10 +274,9 @@ export default function TaskEditor({
           description,
           assignee_pc: assigneePc,
           type_id: typeId,
-          priority_id: priorityId,
+          priority_id: resolvePriorityId(),
           due_date: buildDueValue(),
           status,
-          checklist,
           add_source_files: pendingSource.map((f) => f.path),
           add_completed_files: pendingCompleted.map((f) => f.path)
         }
@@ -316,12 +293,17 @@ export default function TaskEditor({
 
   const fieldsReadOnly = Boolean(readOnlyArchived || isView || (isEdit && lockBlockedBy))
   const formDisabled = fieldsReadOnly || !lockReady || loading
-  const commentsTask = liveTask ?? task
+  const detailTask = liveTask ?? task
   const hasPendingFiles =
     pendingSource.length > 0 ||
     pendingCompleted.length > 0 ||
     removedSourceIds.length > 0 ||
     removedCompletedIds.length > 0
+
+  const duePreviewOverdue = isTaskOverdue({
+    due_date: buildDueValue(),
+    status
+  } as Task)
 
   const editorTitle = isCreate
     ? 'Новая задача'
@@ -349,6 +331,20 @@ export default function TaskEditor({
     } finally {
       setDeleting(false)
     }
+  }
+
+  function renderHistoryButton(disabled = false) {
+    if (!task || isCreate) return null
+    return (
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={disabled || deleting}
+        onClick={() => setHistoryOpen(true)}
+      >
+        История
+      </button>
+    )
   }
 
   function renderEditButton(disabled = false) {
@@ -385,6 +381,13 @@ export default function TaskEditor({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
+      {historyOpen && task && (
+        <TaskHistoryDialog
+          taskId={task.id}
+          taskTitle={task.title}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
       {deleteOpen && task && (
         <ConfirmDialog
           title="Удалить задачу?"
@@ -422,10 +425,6 @@ export default function TaskEditor({
       >
         {!isView && <h2 id="task-editor-title">{editorTitle}</h2>}
 
-        {!task && templates.length > 0 && (
-          <TaskTemplatePicker templates={templates} onApply={applyTemplate} />
-        )}
-
         {isEdit && task && !readOnlyArchived && !lockReady && (
           <p className="sub">Проверка доступа к задаче…</p>
         )}
@@ -433,7 +432,7 @@ export default function TaskEditor({
         {isEdit && lockBlockedBy && (
           <div className="info-box task-lock-warn">
             Сейчас редактирует: <strong>{lockBlockedBy}</strong>. Откройте «Подробнее», чтобы добавить
-            комментарии и файлы.
+            файлы.
           </div>
         )}
 
@@ -443,13 +442,12 @@ export default function TaskEditor({
 
         {error && <div className="error">{error}</div>}
 
-        {isView && task && commentsTask ? (
+        {isView && task && detailTask ? (
           <div className="task-editor-view-body">
             <TaskDetailView
-              task={commentsTask}
+              task={detailTask}
               roomState={roomState}
               taskTypes={taskTypes}
-              taskPriorities={taskPriorities}
             />
 
             <section className="task-detail-block task-detail-files">
@@ -457,56 +455,44 @@ export default function TaskEditor({
               <p className="task-detail-files-hint">
                 Можно прикрепить файлы без редактирования задачи.
               </p>
-              <TaskFileGroupEditor
-                kind="source"
-                existing={commentsTask.source_files}
-                pending={pendingSource}
-                removedIds={removedSourceIds}
-                taskId={task.id}
-                disableAdd={readOnlyArchived}
-                disableRemoveExisting
-                onAdd={() => void pickFiles('source')}
-                onRemoveExisting={(id) => setRemovedSourceIds((prev) => [...prev, id])}
-                onRemovePending={(path) =>
-                  setPendingSource((prev) => prev.filter((f) => f.path !== path))
-                }
-                onOpen={(fileId) => void window.api.openTaskFile(task.id, 'source', fileId)}
-              />
-              <TaskFileGroupEditor
-                kind="completed"
-                existing={commentsTask.completed_files}
-                pending={pendingCompleted}
-                removedIds={removedCompletedIds}
-                taskId={task.id}
-                disableAdd={readOnlyArchived}
-                disableRemoveExisting
-                onAdd={() => void pickFiles('completed')}
-                onRemoveExisting={(id) => setRemovedCompletedIds((prev) => [...prev, id])}
-                onRemovePending={(path) =>
-                  setPendingCompleted((prev) => prev.filter((f) => f.path !== path))
-                }
-                onOpen={(fileId) => void window.api.openTaskFile(task.id, 'completed', fileId)}
-              />
+              <div className="task-file-groups-row">
+                <TaskFileGroupEditor
+                  kind="source"
+                  existing={detailTask.source_files}
+                  pending={pendingSource}
+                  removedIds={removedSourceIds}
+                  taskId={task.id}
+                  disableAdd={readOnlyArchived}
+                  disableRemoveExisting
+                  onAdd={() => void pickFiles('source')}
+                  onRemoveExisting={(id) => setRemovedSourceIds((prev) => [...prev, id])}
+                  onRemovePending={(path) =>
+                    setPendingSource((prev) => prev.filter((f) => f.path !== path))
+                  }
+                  onOpen={(fileId) => void window.api.openTaskFile(task.id, 'source', fileId)}
+                />
+                <TaskFileGroupEditor
+                  kind="completed"
+                  existing={detailTask.completed_files}
+                  pending={pendingCompleted}
+                  removedIds={removedCompletedIds}
+                  taskId={task.id}
+                  disableAdd={readOnlyArchived}
+                  disableRemoveExisting
+                  onAdd={() => void pickFiles('completed')}
+                  onRemoveExisting={(id) => setRemovedCompletedIds((prev) => [...prev, id])}
+                  onRemovePending={(path) =>
+                    setPendingCompleted((prev) => prev.filter((f) => f.path !== path))
+                  }
+                  onOpen={(fileId) => void window.api.openTaskFile(task.id, 'completed', fileId)}
+                />
+              </div>
             </section>
-
-            <TaskComments
-              task={commentsTask}
-              readOnly={readOnlyArchived}
-              onAdded={async () => {
-                const list = readOnlyArchived
-                  ? await window.api.getArchivedTasks()
-                  : await window.api.getTasks()
-                const fresh = list.find((t) => t.id === commentsTask.id)
-                if (fresh) setLiveTask(fresh)
-                onSaved()
-              }}
-            />
-
-            <TaskHistoryPanel taskId={task.id} />
 
             <div className="actions-row task-editor-view-actions">
               {renderDeleteButton(loading)}
               <div className="task-editor-actions-main">
+                {renderHistoryButton(loading)}
                 {renderEditButton(loading)}
               <button type="button" className="btn" onClick={onClose} disabled={loading || deleting}>
                 {hasPendingFiles ? 'Отмена' : 'Закрыть'}
@@ -540,7 +526,7 @@ export default function TaskEditor({
             }}
           >
             <fieldset className="task-editor-fieldset" disabled={formDisabled}>
-              <div className="form-group">
+              <div className="form-group task-editor-title-group">
                 <label htmlFor="taskTitle">Название</label>
                 <input
                   id="taskTitle"
@@ -548,6 +534,22 @@ export default function TaskEditor({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Название задачи"
                   autoFocus={isEdit && !fieldsReadOnly}
+                />
+                <TaskMetaRowEditor
+                  employees={employees}
+                  pcIds={pcIds}
+                  assigneePc={assigneePc}
+                  dueDatePart={dueDatePart}
+                  dueTimePart={dueTimePart}
+                  overdue={duePreviewOverdue}
+                  disabled={formDisabled}
+                  onAssigneeChange={setAssigneePc}
+                  onDueDateChange={setDueDatePart}
+                  onDueTimeChange={setDueTimePart}
+                  onClearDue={() => {
+                    setDueDatePart('')
+                    setDueTimePart('')
+                  }}
                 />
               </div>
 
@@ -563,78 +565,16 @@ export default function TaskEditor({
               </div>
 
               <div className="form-group">
-                <label htmlFor="taskPriority">Приоритет</label>
-                <select
-                  id="taskPriority"
-                  value={priorityId}
-                  onChange={(e) => setPriorityId(e.target.value)}
-                >
-                  {taskPriorities.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label htmlFor="taskDescription">Описание</label>
-                <textarea
+                <AutoResizeTextarea
                   id="taskDescription"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="ТЗ, контекст, что нужно сделать…"
-                  rows={4}
+                  minRows={3}
+                  maxRows={18}
+                  disabled={formDisabled}
                 />
-              </div>
-
-              <TaskChecklist items={checklist} disabled={formDisabled} onChange={setChecklist} />
-
-              <div className="form-group">
-                <label htmlFor="taskAssignee">Ответственный</label>
-                <select
-                  id="taskAssignee"
-                  value={assigneePc}
-                  onChange={(e) => setAssigneePc(e.target.value)}
-                >
-                  {pcIds.map((pcId) => (
-                    <option key={pcId} value={pcId}>
-                      {employees[pcId].name} — {employees[pcId].role}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="taskDue">Срок выполнения</label>
-                <div className="due-datetime-row">
-                  <input
-                    id="taskDue"
-                    type="date"
-                    value={dueDatePart}
-                    onChange={(e) => setDueDatePart(e.target.value)}
-                  />
-                  <input
-                    id="taskDueTime"
-                    type="time"
-                    value={dueTimePart}
-                    onChange={(e) => setDueTimePart(e.target.value)}
-                    aria-label="Время срока"
-                  />
-                </div>
-                <p className="field-hint">Время необязательно — без него срок до конца выбранного дня.</p>
-                {(dueDatePart || dueTimePart) && (
-                  <button
-                    type="button"
-                    className="btn-link"
-                    onClick={() => {
-                      setDueDatePart('')
-                      setDueTimePart('')
-                    }}
-                  >
-                    Очистить срок
-                  </button>
-                )}
               </div>
 
               <div className="form-group">
@@ -655,68 +595,54 @@ export default function TaskEditor({
               <details className="task-editor-section" open>
                 <summary>Документы к задаче</summary>
                 <div className="task-editor-section-body">
-                  <TaskFileGroupEditor
-                    kind="source"
-                    existing={commentsTask?.source_files ?? []}
-                    pending={pendingSource}
-                    removedIds={removedSourceIds}
-                    taskId={task?.id}
-                    disableAdd={readOnlyArchived}
-                    disableRemoveExisting={readOnlyArchived}
-                    onAdd={() => void pickFiles('source')}
-                    onRemoveExisting={(id) => setRemovedSourceIds((prev) => [...prev, id])}
-                    onRemovePending={(path) =>
-                      setPendingSource((prev) => prev.filter((f) => f.path !== path))
-                    }
-                    onOpen={
-                      task
-                        ? (fileId) => void window.api.openTaskFile(task.id, 'source', fileId)
-                        : undefined
-                    }
-                  />
-                  <TaskFileGroupEditor
-                    kind="completed"
-                    existing={commentsTask?.completed_files ?? []}
-                    pending={pendingCompleted}
-                    removedIds={removedCompletedIds}
-                    taskId={task?.id}
-                    disableAdd={readOnlyArchived}
-                    disableRemoveExisting={readOnlyArchived}
-                    onAdd={() => void pickFiles('completed')}
-                    onRemoveExisting={(id) => setRemovedCompletedIds((prev) => [...prev, id])}
-                    onRemovePending={(path) =>
-                      setPendingCompleted((prev) => prev.filter((f) => f.path !== path))
-                    }
-                    onOpen={
-                      task
-                        ? (fileId) => void window.api.openTaskFile(task.id, 'completed', fileId)
-                        : undefined
-                    }
-                  />
+                  <div className="task-file-groups-row">
+                    <TaskFileGroupEditor
+                      kind="source"
+                      existing={detailTask?.source_files ?? []}
+                      pending={pendingSource}
+                      removedIds={removedSourceIds}
+                      taskId={task?.id}
+                      disableAdd={readOnlyArchived}
+                      disableRemoveExisting={readOnlyArchived}
+                      onAdd={() => void pickFiles('source')}
+                      onRemoveExisting={(id) => setRemovedSourceIds((prev) => [...prev, id])}
+                      onRemovePending={(path) =>
+                        setPendingSource((prev) => prev.filter((f) => f.path !== path))
+                      }
+                      onOpen={
+                        task
+                          ? (fileId) => void window.api.openTaskFile(task.id, 'source', fileId)
+                          : undefined
+                      }
+                    />
+                    <TaskFileGroupEditor
+                      kind="completed"
+                      existing={detailTask?.completed_files ?? []}
+                      pending={pendingCompleted}
+                      removedIds={removedCompletedIds}
+                      taskId={task?.id}
+                      disableAdd={readOnlyArchived}
+                      disableRemoveExisting={readOnlyArchived}
+                      onAdd={() => void pickFiles('completed')}
+                      onRemoveExisting={(id) => setRemovedCompletedIds((prev) => [...prev, id])}
+                      onRemovePending={(path) =>
+                        setPendingCompleted((prev) => prev.filter((f) => f.path !== path))
+                      }
+                      onOpen={
+                        task
+                          ? (fileId) => void window.api.openTaskFile(task.id, 'completed', fileId)
+                          : undefined
+                      }
+                    />
+                  </div>
                 </div>
               </details>
             </fieldset>
 
-            {commentsTask && (
-              <TaskComments
-                task={commentsTask}
-                readOnly={readOnlyArchived}
-                onAdded={async () => {
-                  const list = readOnlyArchived
-                    ? await window.api.getArchivedTasks()
-                    : await window.api.getTasks()
-                  const fresh = list.find((t) => t.id === commentsTask.id)
-                  if (fresh) setLiveTask(fresh)
-                  onSaved()
-                }}
-              />
-            )}
-
-            {task && <TaskHistoryPanel taskId={task.id} />}
-
             <div className="actions-row task-editor-actions">
               {renderDeleteButton(formDisabled)}
               <div className="task-editor-actions-main">
+                {renderHistoryButton(formDisabled)}
                 <button type="button" className="btn" onClick={onClose} disabled={loading || deleting}>
                   {fieldsReadOnly && !hasPendingFiles ? 'Закрыть' : 'Отмена'}
                 </button>

@@ -4,7 +4,6 @@ import { daysOverdue } from '../../shared/dates'
 import { STATUS_LABELS } from '../../shared/taskStatus'
 import { formatDueDate } from '../utils/dates'
 import TaskEditor from '../components/TaskEditor'
-import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
 interface Props {
@@ -14,7 +13,6 @@ interface Props {
 
 export default function OverdueReportScreen({ room, onTasksChanged }: Props) {
   const { types: taskTypes } = useTaskTypes()
-  const { priorities: taskPriorities } = useTaskPriorities()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -86,7 +84,6 @@ export default function OverdueReportScreen({ room, onTasksChanged }: Props) {
           roomState={room.state}
           currentPcId={room.pcId}
           taskTypes={taskTypes}
-          taskPriorities={taskPriorities}
           task={editingTask}
           defaultStatus={editingTask.status}
           onClose={() => setEditingTask(null)}

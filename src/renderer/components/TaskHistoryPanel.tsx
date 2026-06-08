@@ -4,6 +4,7 @@ import { HISTORY_ACTION_LABELS } from '../../shared/taskHistory'
 
 interface Props {
   taskId: string
+  showTitle?: boolean
 }
 
 function formatTime(ts: number): string {
@@ -16,7 +17,7 @@ function formatTime(ts: number): string {
   })
 }
 
-export default function TaskHistoryPanel({ taskId }: Props) {
+export default function TaskHistoryPanel({ taskId, showTitle = true }: Props) {
   const [entries, setEntries] = useState<TaskHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -33,7 +34,7 @@ export default function TaskHistoryPanel({ taskId }: Props) {
 
   return (
     <div className="task-history">
-      <h3 className="task-section-title">История изменений</h3>
+      {showTitle && <h3 className="task-section-title">История изменений</h3>}
       <ul className="task-history-list">
         {entries.map((e) => (
           <li key={e.id}>

@@ -1,19 +1,19 @@
-import { type ChangeEvent, type CSSProperties, type MouseEvent } from 'react'
-import type { Employee, Task, TaskFileKind, TaskPriority, TaskType } from '../../shared/types'
-import { STATUS_LABELS, TASK_STATUSES, type TaskStatus } from '../../shared/taskStatus'
+import { type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import type { Employee, Task, TaskFileKind, TaskType } from '../../shared/types'
+import type { TaskStatus } from '../../shared/taskStatus'
 import { TASK_FILE_GROUP_LABELS, taskHasFiles, formatFileCountRu } from '../../shared/taskFiles'
 import { isTaskOverdue } from '../../shared/overdue'
 import { UI_HINTS } from '../hints/uiHints'
-import { formatDueDate, formatDueDateShort } from '../utils/dates'
 import TooltipWrap from './TooltipWrap'
-import { findTaskPriority, findTaskType } from '../utils/taskTypes'
-
+import { findTaskType } from '../utils/taskTypes'
+import { TaskMetaRowReadonly } from './TaskMetaRow'
+import TaskStatusCubes from './TaskStatusCubes'
 interface Props {
   task: Task
   taskTypes: TaskType[]
-  taskPriorities: TaskPriority[]
   assignee?: Employee
   columnAccent?: string
+  hideAssignee?: boolean
   isCollapsed: boolean
   onToggleCollapse: () => void
   onViewDetails: (task: Task) => void
@@ -67,15 +67,6 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function AssigneeAvatar({ name }: { name: string }) {
-  const initial = name.trim().charAt(0).toUpperCase() || '?'
-  return (
-    <span className="task-card-avatar" aria-hidden="true">
-      {initial}
-    </span>
-  )
-}
-
 function TaskLabel({
   label,
   color,
@@ -98,21 +89,27 @@ function TaskLabel({
   )
 }
 
-function TaskLabelsRibbon({
+function TaskCardHeaderRow({
   taskType,
-  priority,
   typeColor,
+  assignee,
+  assigneeName,
   dueDate,
-  overdue
+  overdue,
+  fileBadge,
+  hideAssignee = false
 }: {
   taskType?: TaskType
-  priority?: TaskPriority
   typeColor: string
+  assignee?: Employee
+  assigneeName: string
   dueDate: string | null
   overdue: boolean
+  fileBadge?: ReactNode
+  hideAssignee?: boolean
 }) {
   return (
-    <div className="task-card-labels" aria-label="Метки задачи">
+    <div className="task-card-labels" aria-label="Вид задачи, ответственный и срок">
       {taskType ? (
         <TaskLabel
           variant="type"
@@ -123,41 +120,15 @@ function TaskLabelsRibbon({
       ) : (
         <TaskLabel variant="muted" label="Без вида" title="Вид не указан" />
       )}
-      {priority ? (
-        <TaskLabel
-          variant="priority"
-          label={priority.name}
-          color={priority.color}
-          title={`Приоритет: ${priority.name}`}
-        />
-      ) : (
-        <TaskLabel variant="muted" label="Без приоритета" title="Приоритет не указан" />
-      )}
-      {dueDate ? (
-        <TaskLabel
-          variant={overdue ? 'overdue' : 'due'}
-          label={formatDueDateShort(dueDate)}
-          title={
-            overdue ? `Просрочено: ${formatDueDate(dueDate)}` : `Срок: ${formatDueDate(dueDate)}`
-          }
-        />
-      ) : (
-        <TaskLabel variant="muted" label="Без срока" title="Срок не указан" />
-      )}
-    </div>
-  )
-}
-
-function ChecklistProgress({ done, total }: { done: number; total: number }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
-  return (
-    <div className="task-card-checklist-progress" title={`Чек-лист: ${done} из ${total}`}>
-      <div className="task-card-checklist-track" aria-hidden="true">
-        <div className="task-card-checklist-fill" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="task-card-checklist-label">
-        {done}/{total}
-      </span>
+      <TaskMetaRowReadonly
+        assignee={assignee}
+        assigneeName={assigneeName}
+        dueDate={dueDate}
+        overdue={overdue}
+        variant="card-header"
+        fileBadge={fileBadge}
+        hideAssignee={hideAssignee}
+      />
     </div>
   )
 }
@@ -165,9 +136,9 @@ function ChecklistProgress({ done, total }: { done: number; total: number }) {
 export default function TaskCard({
   task,
   taskTypes,
-  taskPriorities,
   assignee,
   columnAccent,
+  hideAssignee = false,
   isCollapsed,
   onToggleCollapse,
   onViewDetails,
@@ -177,11 +148,8 @@ export default function TaskCard({
 }: Props) {
   const overdue = isTaskOverdue(task)
   const taskType = findTaskType(taskTypes, task.type_id)
-  const priority = findTaskPriority(taskPriorities, task.priority_id)
-  const priorityColor = priority?.color ?? columnAccent ?? '#64748b'
+  const accentColor = taskType?.color ?? columnAccent ?? '#64748b'
   const typeColor = taskType?.color ?? '#64748b'
-  const checklistDone = task.checklist.filter((i) => i.done).length
-  const checklistTotal = task.checklist.length
   const hasFiles = taskHasFiles(task)
   const assigneeName = assignee?.name ?? '—'
 
@@ -193,11 +161,9 @@ export default function TaskCard({
   )
   const previewFiles = fileEntries.slice(0, FILE_PREVIEW_LIMIT)
   const hiddenFileCount = fileEntries.length - previewFiles.length
-
-  function onStatusSelect(e: ChangeEvent<HTMLSelectElement>) {
-    const next = e.target.value as TaskStatus
-    if (next !== task.status) onStatusChange(task.id, next)
-  }
+  const fileBadge = hasFiles ? (
+    <span className="task-meta-badge">{formatFileCountRu(fileEntries.length)}</span>
+  ) : undefined
 
   function handleToggleAreaClick(e: MouseEvent<HTMLElement>) {
     if (isInteractiveTarget(e.target)) return
@@ -227,27 +193,13 @@ export default function TaskCard({
   function renderFooter() {
     return (
       <div className={`task-card-footer ${isCollapsed ? 'task-card-footer--compact' : ''}`}>
-        <label className="task-status-select-wrap" title={UI_HINTS.taskCard.status}>
-          <span
-            className={`task-status-select-label ${isCollapsed ? 'task-status-select-label--sr' : ''}`}
-          >
-            Этап
-          </span>
-          <select
-            className="task-status-select task-card-no-drag"
-            value={task.status}
-            onChange={onStatusSelect}
-            aria-label="На каком этапе задача"
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {TASK_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {STATUS_LABELS[status]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <TaskStatusCubes
+          status={task.status}
+          compact={isCollapsed}
+          onChange={(next) => {
+            if (next !== task.status) onStatusChange(task.id, next)
+          }}
+        />
         <div className="task-card-footer-actions">
           <TooltipWrap text={UI_HINTS.taskCard.details}>
             <button
@@ -288,9 +240,9 @@ export default function TaskCard({
       className={`task-card ${overdue ? 'is-overdue' : ''} ${isCollapsed ? 'is-collapsed' : 'is-expanded'}`}
       style={
         {
-          borderLeftColor: priorityColor,
+          borderLeftColor: accentColor,
           '--task-type-color': typeColor,
-          '--task-priority-color': priorityColor
+          '--task-priority-color': accentColor
         } as CSSProperties
       }
       draggable
@@ -317,12 +269,15 @@ export default function TaskCard({
             }
           }}
         >
-          <TaskLabelsRibbon
+          <TaskCardHeaderRow
             taskType={taskType}
-            priority={priority}
             typeColor={typeColor}
+            assignee={assignee}
+            assigneeName={assigneeName}
             dueDate={task.due_date}
             overdue={overdue}
+            fileBadge={fileBadge}
+            hideAssignee={hideAssignee}
           />
 
           <div className="task-card-compact-main">
@@ -332,38 +287,19 @@ export default function TaskCard({
                 <h4 className="task-card-title task-card-title--compact">{task.title}</h4>
               </TooltipWrap>
             </div>
-
-            <div className="task-card-compact-bottom">
-              <div className="task-card-compact-assignee">
-              <AssigneeAvatar name={assignee?.name ?? ''} />
-              <div className="task-card-compact-assignee-text">
-                <span className="task-card-compact-assignee-name">{assigneeName}</span>
-                {assignee?.role && (
-                  <span className="task-card-compact-assignee-role">{assignee.role}</span>
-                )}
-              </div>
-            </div>
-            {(checklistTotal > 0 || hasFiles) && (
-              <div className="task-card-compact-badges" aria-label="Дополнительно">
-                {checklistTotal > 0 && (
-                  <ChecklistProgress done={checklistDone} total={checklistTotal} />
-                )}
-                {hasFiles && (
-                  <span className="task-card-compact-badge">{formatFileCountRu(fileEntries.length)}</span>
-                )}
-              </div>
-            )}
-          </div>
           </div>
         </div>
       ) : (
         <div className="task-card-expanded">
-          <TaskLabelsRibbon
+          <TaskCardHeaderRow
             taskType={taskType}
-            priority={priority}
             typeColor={typeColor}
+            assignee={assignee}
+            assigneeName={assigneeName}
             dueDate={task.due_date}
             overdue={overdue}
+            fileBadge={fileBadge}
+            hideAssignee={hideAssignee}
           />
 
           <div className="task-card-body">
@@ -389,19 +325,6 @@ export default function TaskCard({
                 <p className="task-card-comment">{task.description}</p>
               ) : (
                 <p className="task-card-comment task-card-comment--empty">Без описания</p>
-              )}
-
-              {(checklistTotal > 0 || hasFiles) && (
-                <div className="task-card-stats">
-                  {checklistTotal > 0 && (
-                    <ChecklistProgress done={checklistDone} total={checklistTotal} />
-                  )}
-                  {hasFiles && (
-                    <span className="task-card-stat-pill">
-                      {formatFileCountRu(fileEntries.length)}
-                    </span>
-                  )}
-                </div>
               )}
 
               {hasFiles && (
@@ -431,16 +354,6 @@ export default function TaskCard({
                   )}
                 </ul>
               )}
-
-              <div className="task-card-people">
-                <AssigneeAvatar name={assigneeName} />
-                <div className="task-card-people-text">
-                  <span className="task-card-people-name">{assigneeName}</span>
-                  {assignee?.role && (
-                    <span className="task-card-people-role">{assignee.role}</span>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
         </div>

@@ -581,7 +581,7 @@ export class BoardSyncManager {
         source_files,
         completed_files,
         comments: [],
-        checklist: input.checklist ?? [],
+        checklist: [],
         archived_at: null,
         created_by_pc: this.pcId,
         created_at: now,
@@ -619,7 +619,6 @@ export class BoardSyncManager {
         priority_id: this.taskPriorities.resolvePriorityId(input.priority_id),
         due_date: normalizeDueDateStorage(input.due_date ?? null),
         status: input.status,
-        checklist: input.checklist ?? prev.checklist,
         updated_at: Math.floor(Date.now() / 1000)
       }
 
@@ -627,36 +626,6 @@ export class BoardSyncManager {
       await this.recordHistory(prev, this.taskCache.get(updated.id) ?? updated)
       await this.finishMutation(merged)
       return { status: 'ok', task: this.taskCache.get(updated.id) ?? updated }
-    })
-  }
-
-  async addTaskComment(taskId: string, text: string): Promise<Task> {
-    const trimmed = text.trim()
-    if (!trimmed) throw new Error('Введите текст комментария')
-    return this.withBoardMutation(async (tasks) => {
-      const idx = tasks.findIndex((t) => t.id === taskId)
-      if (idx === -1) throw new Error('Задача не найдена')
-
-      const prev = tasks[idx]
-      const { key, name } = this.actor()
-      const now = Math.floor(Date.now() / 1000)
-      const comment: TaskComment = {
-        id: newCommentId(),
-        author_pc: key,
-        author_name: name,
-        text: trimmed,
-        created_at: now
-      }
-
-      const updated: Task = {
-        ...prev,
-        comments: [...prev.comments, comment],
-        updated_at: now
-      }
-      const merged = await this.persistTask(updated, { force: true })
-      await this.recordHistory(prev, this.taskCache.get(updated.id) ?? updated)
-      await this.finishMutation(merged)
-      return this.taskCache.get(updated.id) ?? updated
     })
   }
 
@@ -668,6 +637,23 @@ export class BoardSyncManager {
       const updated: Task = {
         ...prev,
         status,
+        updated_at: Math.floor(Date.now() / 1000)
+      }
+      const merged = await this.persistTask(updated)
+      await this.recordHistory(prev, this.taskCache.get(updated.id) ?? updated)
+      await this.finishMutation(merged)
+    })
+  }
+
+  async updateTaskAssignee(taskId: string, assigneePc: string): Promise<void> {
+    await this.withBoardMutation(async (tasks) => {
+      const idx = tasks.findIndex((t) => t.id === taskId)
+      if (idx === -1) throw new Error('Задача не найдена')
+      const prev = tasks[idx]
+      if (prev.assignee_pc === assigneePc) return
+      const updated: Task = {
+        ...prev,
+        assignee_pc: assigneePc,
         updated_at: Math.floor(Date.now() / 1000)
       }
       const merged = await this.persistTask(updated)

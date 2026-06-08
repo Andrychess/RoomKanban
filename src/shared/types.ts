@@ -1,4 +1,3 @@
-import type { ColumnSortId } from './columnSort'
 import type { TaskStatus } from './taskStatus'
 
 export interface PasswordSecret {
@@ -101,6 +100,7 @@ export interface TaskComment {
   created_at: number
 }
 
+/** @deprecated В данных старых задач; в интерфейсе не используется */
 export interface ChecklistItem {
   id: string
   text: string
@@ -148,7 +148,7 @@ export interface TaskTemplate {
   /** Срок = сегодня + N дней */
   due_days_offset: number
   status: Task['status']
-  checklist: ChecklistItem[]
+  checklist?: ChecklistItem[]
 }
 
 export interface TaskTemplatesData {
@@ -182,6 +182,7 @@ export interface Task {
   /** Итоговые документы после выполнения (приказ и т.п.) */
   completed_files: TaskFile[]
   comments: TaskComment[]
+  /** @deprecated только для чтения старых JSON */
   checklist: ChecklistItem[]
   /** Unix sec; null — на доске */
   archived_at: number | null
@@ -210,7 +211,6 @@ export interface CreateTaskInput {
   priority_id: string
   due_date?: string | null
   status?: Task['status']
-  checklist?: ChecklistItem[]
   add_source_files?: string[]
   add_completed_files?: string[]
 }
@@ -224,7 +224,6 @@ export interface UpdateTaskInput {
   priority_id: string
   due_date?: string | null
   status: Task['status']
-  checklist?: ChecklistItem[]
   /** updated_at задачи при открытии редактора — для проверки конфликта */
   client_base_updated_at?: number
   /** Сохранить, даже если на диске уже есть более новая версия */
@@ -273,8 +272,6 @@ export interface AppSettings {
   machineFingerprint: string
   /** Последний выбранный профиль сотрудника для папки комнаты */
   employeeBindings: Record<string, string>
-  /** Сортировка задач в колонках канбана по пути комнаты */
-  kanbanColumnSort?: Record<string, Partial<Record<TaskStatus, ColumnSortId>>>
   /** Свёрнутые колонки канбана по пути комнаты */
   kanbanColumnCollapsed?: Record<string, Partial<Record<TaskStatus, boolean>>>
   /** Отправленные напоминания: roomPath → taskId:dueDate:kind → timestamp */

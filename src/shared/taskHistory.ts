@@ -78,19 +78,6 @@ export function buildHistoryEntries(
     }
   }
 
-  if (prev.comments.length !== next.comments.length) {
-    const added = next.comments.length - prev.comments.length
-    if (added > 0) {
-      entries.push({ ...base, action: 'comment_added', detail: String(added) })
-    }
-  }
-
-  const prevCheck = JSON.stringify(prev.checklist)
-  const nextCheck = JSON.stringify(next.checklist)
-  if (prevCheck !== nextCheck) {
-    entries.push({ ...base, action: 'checklist_changed' })
-  }
-
   if (!prev.archived_at && next.archived_at) {
     entries.push({ ...base, action: 'archived' })
   }

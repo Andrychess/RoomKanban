@@ -1,6 +1,6 @@
 {
   "name": "room-kanban",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "RoomKanban — kanban with folder-based room sync",
   "main": "out/main/index.js",
   "scripts": {

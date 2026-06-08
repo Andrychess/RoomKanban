@@ -6,7 +6,6 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import TaskEditor from '../components/TaskEditor'
 import TooltipWrap from '../components/TooltipWrap'
 import { UI_HINTS } from '../hints/uiHints'
-import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
 interface Props {
@@ -20,7 +19,6 @@ function formatArchived(ts: number): string {
 
 export default function ArchiveScreen({ room, onTasksChanged }: Props) {
   const { types: taskTypes } = useTaskTypes()
-  const { priorities: taskPriorities } = useTaskPriorities()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -150,7 +148,6 @@ export default function ArchiveScreen({ room, onTasksChanged }: Props) {
           roomState={room.state}
           currentPcId={room.pcId}
           taskTypes={taskTypes}
-          taskPriorities={taskPriorities}
           task={editingTask}
           defaultStatus={editingTask.status}
           readOnlyArchived

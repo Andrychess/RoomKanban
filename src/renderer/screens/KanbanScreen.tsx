@@ -2,29 +2,21 @@ import { useMemo, useState } from 'react'
 import type { Room, Task, TaskFileKind } from '../../shared/types'
 import { sortTasksInColumn } from '../../shared/columnSort'
 import { COLUMN_THEMES, KANBAN_COLUMNS } from '../../shared/taskStatus'
-import ColumnSortSelect from '../components/ColumnSortSelect'
 import ConfirmDialog from '../components/ConfirmDialog'
 import KanbanFilters from '../components/KanbanFilters'
 import TooltipWrap from '../components/TooltipWrap'
 import { UI_HINTS } from '../hints/uiHints'
 import { useCollapsedTaskCards } from '../hooks/useCollapsedTaskCards'
 import { useKanbanColumnCollapse } from '../hooks/useKanbanColumnCollapse'
-import { useKanbanColumnSort } from '../hooks/useKanbanColumnSort'
-import { useOverdueCount } from '../hooks/useOverdueCount'
 import TaskCard from '../components/TaskCard'
 import TaskEditor, { type TaskEditorMode } from '../components/TaskEditor'
-import RoomLabelsSettings from '../components/RoomLabelsSettings'
-import TaskTemplatesSettings from '../components/TaskTemplatesSettings'
 import { useKanbanTaskFilters } from '../hooks/useKanbanTaskFilters'
-import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
 interface Props {
   room: Room
   tasks: Task[]
   onTasksChange: () => void
-  onOpenOverdue?: () => void
-  overdueCount?: number
   tasksLoadError?: string | null
 }
 
@@ -32,29 +24,21 @@ export default function KanbanScreen({
   room,
   tasks,
   onTasksChange,
-  onOpenOverdue,
-  overdueCount = 0,
   tasksLoadError = null
 }: Props) {
-  const localOverdueCount = useOverdueCount(tasks)
-  const overdue = overdueCount > 0 ? overdueCount : localOverdueCount
-  const { types: taskTypes, refresh: refreshTypes } = useTaskTypes()
-  const { priorities: taskPriorities, refresh: refreshPriorities } = useTaskPriorities()
+  const { types: taskTypes } = useTaskTypes()
   const { filters, setFilters, filteredTasks, hasActiveFilters, resetFilters } =
     useKanbanTaskFilters(tasks, room.pcId, room.state.employees)
-  const { sorts, setColumnSort } = useKanbanColumnSort(room.path)
   const { collapsed, toggleColumnCollapsed, expandColumn } = useKanbanColumnCollapse(room.path)
   const { isTaskCollapsed, toggleTaskCollapsed } = useCollapsedTaskCards(room.path)
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<TaskEditorMode>('create')
-  const [typesOpen, setTypesOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [defaultStatus, setDefaultStatus] = useState<Task['status']>('review')
   const [dropTarget, setDropTarget] = useState<Task['status'] | null>(null)
   const [archiveDoneOpen, setArchiveDoneOpen] = useState(false)
   const [archivingDone, setArchivingDone] = useState(false)
-  const [templatesOpen, setTemplatesOpen] = useState(false)
 
   const doneCount = useMemo(
     () => tasks.filter((t) => t.status === 'done').length,
@@ -122,61 +106,23 @@ export default function KanbanScreen({
   return (
     <>
       {tasksLoadError && <div className="error banner-error">{tasksLoadError}</div>}
-      <div className="kanban-toolbar">
-        <TooltipWrap text={UI_HINTS.kanban.newTask}>
-          <button
-            type="button"
-            className="btn btn-primary btn-lg"
-            onClick={() => openCreate('review')}
-          >
-            + Новая задача
-          </button>
-        </TooltipWrap>
-        {room.isChief && onOpenOverdue && (
-          <TooltipWrap text={UI_HINTS.kanban.overdue}>
-            <button
-              type="button"
-              className={`btn btn-ghost ${overdue > 0 ? 'btn-alert' : ''}`}
-              onClick={onOpenOverdue}
-            >
-              Просрочено{overdue > 0 ? ` (${overdue})` : ''}
-            </button>
-          </TooltipWrap>
-        )}
-        {room.isChief && (
-          <TooltipWrap text={UI_HINTS.kanban.templates}>
-            <button type="button" className="btn btn-ghost" onClick={() => setTemplatesOpen(true)}>
-              Шаблоны
-            </button>
-          </TooltipWrap>
-        )}
-        {room.isChief && (
-          <TooltipWrap text={UI_HINTS.kanban.labels}>
-            <button type="button" className="btn btn-ghost" onClick={() => setTypesOpen(true)}>
-              Настройка меток
-            </button>
-          </TooltipWrap>
-        )}
-        <p className="kanban-hint">{UI_HINTS.kanban.dragHint}</p>
-      </div>
-
+      <div className="kanban-layout">
       <KanbanFilters
         filters={filters}
         employees={room.state.employees}
         taskTypes={taskTypes}
-        taskPriorities={taskPriorities}
         hasActiveFilters={hasActiveFilters}
         onChange={setFilters}
         onReset={resetFilters}
       />
 
+      <div className="kanban-board-scroll">
       <div className="kanban-board">
         {KANBAN_COLUMNS.map((col) => {
           const theme = COLUMN_THEMES[col.id]
           const columnTasks = sortTasksInColumn(
             filteredTasks.filter((t) => t.status === col.id),
-            sorts[col.id],
-            taskPriorities
+            taskTypes
           )
           const totalInColumn = tasks.filter((t) => t.status === col.id).length
           const countLabel =
@@ -249,24 +195,16 @@ export default function KanbanScreen({
                     </button>
                   </TooltipWrap>
                 </div>
-                {!isCollapsed && (
-                  <>
-                    <ColumnSortSelect
-                      value={sorts[col.id]}
-                      onChange={(sortId) => void setColumnSort(col.id, sortId)}
-                    />
-                    {col.id === 'done' && doneCount > 0 && (
-                      <TooltipWrap text={UI_HINTS.kanban.columnArchive}>
-                        <button
-                          type="button"
-                          className="column-clear"
-                          onClick={() => setArchiveDoneOpen(true)}
-                        >
-                          В архив
-                        </button>
-                      </TooltipWrap>
-                    )}
-                  </>
+                {!isCollapsed && col.id === 'done' && doneCount > 0 && (
+                  <TooltipWrap text={UI_HINTS.kanban.columnArchive}>
+                    <button
+                      type="button"
+                      className="column-clear"
+                      onClick={() => setArchiveDoneOpen(true)}
+                    >
+                      В архив
+                    </button>
+                  </TooltipWrap>
                 )}
               </header>
 
@@ -284,7 +222,6 @@ export default function KanbanScreen({
                     key={task.id}
                     task={task}
                     taskTypes={taskTypes}
-                    taskPriorities={taskPriorities}
                     assignee={room.state.employees[task.assignee_pc]}
                     columnAccent={theme.accent}
                     isCollapsed={isTaskCollapsed(task.id)}
@@ -301,6 +238,8 @@ export default function KanbanScreen({
           )
         })}
       </div>
+      </div>
+      </div>
 
       {archiveDoneOpen && (
         <ConfirmDialog
@@ -313,16 +252,11 @@ export default function KanbanScreen({
         />
       )}
 
-      {templatesOpen && (
-        <TaskTemplatesSettings onClose={() => setTemplatesOpen(false)} />
-      )}
-
       {editorOpen && (
         <TaskEditor
           roomState={room.state}
           currentPcId={room.pcId}
           taskTypes={taskTypes}
-          taskPriorities={taskPriorities}
           task={editingTask}
           mode={editorMode}
           defaultStatus={defaultStatus}
@@ -331,18 +265,6 @@ export default function KanbanScreen({
         />
       )}
 
-      {typesOpen && room.isChief && (
-        <RoomLabelsSettings
-          types={taskTypes}
-          priorities={taskPriorities}
-          onClose={() => setTypesOpen(false)}
-          onSaved={() => {
-            refreshTypes()
-            refreshPriorities()
-            onTasksChange()
-          }}
-        />
-      )}
     </>
   )
 }

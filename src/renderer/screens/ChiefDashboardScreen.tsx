@@ -7,7 +7,6 @@ import TooltipWrap from '../components/TooltipWrap'
 import HintIcon from '../components/HintIcon'
 import { UI_HINTS } from '../hints/uiHints'
 import TaskEditor from '../components/TaskEditor'
-import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
 interface Props {
@@ -18,7 +17,6 @@ interface Props {
 
 export default function ChiefDashboardScreen({ room, onOpenOverdue, onTasksChanged }: Props) {
   const { types: taskTypes } = useTaskTypes()
-  const { priorities: taskPriorities } = useTaskPriorities()
   const [data, setData] = useState<ChiefDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -127,7 +125,6 @@ export default function ChiefDashboardScreen({ room, onOpenOverdue, onTasksChang
           roomState={room.state}
           currentPcId={room.pcId}
           taskTypes={taskTypes}
-          taskPriorities={taskPriorities}
           task={editingTask}
           defaultStatus={editingTask.status}
           onClose={() => setEditingTask(null)}

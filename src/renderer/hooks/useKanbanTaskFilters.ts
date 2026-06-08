@@ -20,14 +20,12 @@ function matchesOwnership(
 }
 
 export interface KanbanTaskFilters {
-  priorityId: string
   typeId: string
   ownership: OwnershipFilter
   query: string
 }
 
 const DEFAULT_FILTERS: KanbanTaskFilters = {
-  priorityId: 'all',
   typeId: 'all',
   ownership: 'all',
   query: ''
@@ -41,16 +39,12 @@ export function useKanbanTaskFilters(
   const [filters, setFilters] = useState<KanbanTaskFilters>(DEFAULT_FILTERS)
 
   const hasActiveFilters =
-    filters.priorityId !== 'all' ||
     filters.typeId !== 'all' ||
     filters.ownership !== 'all' ||
     filters.query.trim().length > 0
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
-      if (filters.priorityId !== 'all' && task.priority_id !== filters.priorityId) {
-        return false
-      }
       if (filters.typeId !== 'all' && task.type_id !== filters.typeId) {
         return false
       }

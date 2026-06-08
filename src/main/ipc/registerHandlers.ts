@@ -14,7 +14,8 @@ import { ExchangeStore } from '../sync/ExchangeStore'
 import { NotesStore } from '../sync/NotesStore'
 import { refreshRoomSync } from '../sync/refreshRoomSync'
 import { TaskTypesStore } from '../sync/TaskTypesStore'
-import type { ColumnSortId } from '../../shared/columnSort'
+import { seedTestTasks } from '../dev/seedTestTasks'
+import { SEED_TEST_TASK_COUNT } from '../../shared/seedTestTasks'
 import type {
   CreateTaskInput,
   EnterRoomCredentials,
@@ -261,18 +262,6 @@ export function registerHandlers(
     }
   })
 
-  ipcMain.handle('get-column-sorts', (_e, roomPath: string) => {
-    return settings.getAllColumnSorts(roomPath)
-  })
-
-  ipcMain.handle(
-    'set-column-sort',
-    async (_e, roomPath: string, column: TaskStatus, sortId: ColumnSortId) => {
-      await settings.setColumnSort(roomPath, column, sortId)
-      return settings.getAllColumnSorts(roomPath)
-    }
-  )
-
   ipcMain.handle('get-column-collapsed', (_e, roomPath: string) => {
     return settings.getAllColumnCollapsed(roomPath)
   })
@@ -403,6 +392,17 @@ export function registerHandlers(
     return boardSync.createTask(input)
   })
 
+  ipcMain.handle('seed-test-tasks', async () => {
+    const room = requireOpenRoom()
+    if (!room.isChief) throw new Error('Доступно только начальнику')
+    if (!boardSync) throw new Error('Комната не открыта')
+    const count = await seedTestTasks(boardSync, room)
+    if (count !== SEED_TEST_TASK_COUNT) {
+      throw new Error(`Создано ${count} из ${SEED_TEST_TASK_COUNT} задач`)
+    }
+    return { count }
+  })
+
   ipcMain.handle('update-task', async (_e, input: UpdateTaskInput) => {
     if (!boardSync) throw new Error('Комната не открыта')
     assertTaskId(input.id)
@@ -467,6 +467,17 @@ export function registerHandlers(
     }
   })
 
+  ipcMain.handle('update-task-assignee', async (_e, taskId: string, assigneePc: string) => {
+    if (!boardSync) throw new Error('Комната не открыта')
+    assertTaskId(taskId)
+    if (!assigneePc.trim()) throw new Error('Не указан ответственный')
+    try {
+      await boardSync.updateTaskAssignee(taskId, assigneePc)
+    } catch (err) {
+      throw new Error(toErrorMessage(err))
+    }
+  })
+
   ipcMain.handle('clear-done-tasks', async () => {
     if (!boardSync) throw new Error('Комната не открыта')
     return boardSync.archiveDoneTasks()
@@ -518,16 +529,6 @@ export function registerHandlers(
     assertTaskId(taskId)
     if (!taskHistoryStore) return []
     return taskHistoryStore.getForTask(taskId)
-  })
-
-  ipcMain.handle('add-task-comment', async (_e, taskId: string, text: string) => {
-    if (!boardSync) throw new Error('Комната не открыта')
-    assertTaskId(taskId)
-    try {
-      return await boardSync.addTaskComment(taskId, text)
-    } catch (err) {
-      throw new Error(toErrorMessage(err))
-    }
   })
 
   ipcMain.handle('get-chief-dashboard', async () => {

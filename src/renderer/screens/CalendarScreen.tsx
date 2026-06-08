@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react'
 import type { Room, Task } from '../../shared/types'
 import { STATUS_LABELS } from '../../shared/taskStatus'
 import TaskEditor, { type TaskEditorMode } from '../components/TaskEditor'
-import { useTaskPriorities } from '../hooks/useTaskPriorities'
 import { useTaskTypes } from '../hooks/useTaskTypes'
-import { findTaskPriority, findTaskType } from '../utils/taskTypes'
+import { findTaskType } from '../utils/taskTypes'
 import { isTaskOverdue } from '../../shared/overdue'
 import TooltipWrap from '../components/TooltipWrap'
 import HintIcon from '../components/HintIcon'
@@ -25,7 +24,6 @@ interface Props {
 
 export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
   const { types: taskTypes } = useTaskTypes()
-  const { priorities: taskPriorities } = useTaskPriorities()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -124,18 +122,6 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
             </span>
           ))}
         </div>
-        <div className="task-types-legend">
-          <span className="legend-section-title">Приоритеты:</span>
-          {taskPriorities.map((p) => (
-            <span
-              key={p.id}
-              className="legend-priority-chip"
-              style={{ borderColor: p.color, color: p.color }}
-            >
-              {p.name}
-            </span>
-          ))}
-        </div>
       </div>
 
       <div className="calendar-weekdays">
@@ -174,7 +160,6 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
                   const overdue = isTaskOverdue(task)
                   const assignee = room.state.employees[task.assignee_pc]
                   const type = findTaskType(taskTypes, task.type_id)
-                  const priority = findTaskPriority(taskPriorities, task.priority_id)
                   return (
                     <li key={task.id}>
                       <button
@@ -187,14 +172,6 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
                           {type && (
                             <span className="calendar-task-type" style={{ color: type.color }}>
                               {type.name}
-                            </span>
-                          )}
-                          {priority && (
-                            <span
-                              className="calendar-task-priority"
-                              style={{ color: priority.color }}
-                            >
-                              {priority.name}
                             </span>
                           )}
                         </span>
@@ -222,7 +199,6 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
           <ul className="unscheduled-list">
             {unscheduled.map((task) => {
               const type = findTaskType(taskTypes, task.type_id)
-              const priority = findTaskPriority(taskPriorities, task.priority_id)
               return (
                 <li key={task.id}>
                   <button type="button" className="unscheduled-item" onClick={() => openViewDetails(task)}>
@@ -230,14 +206,6 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
                       {type && (
                         <span className="task-type-badge small" style={{ background: type.color }}>
                           {type.name}
-                        </span>
-                      )}
-                      {priority && (
-                        <span
-                          className="task-priority-badge small"
-                          style={{ borderColor: priority.color, color: priority.color }}
-                        >
-                          {priority.name}
                         </span>
                       )}
                     </span>
@@ -272,7 +240,6 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
           roomState={room.state}
           currentPcId={room.pcId}
           taskTypes={taskTypes}
-          taskPriorities={taskPriorities}
           task={editingTask}
           mode={editorMode}
           defaultStatus="review"

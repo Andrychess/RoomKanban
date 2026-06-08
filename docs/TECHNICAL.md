@@ -498,7 +498,7 @@ OficceHelper/
 | `subscribe-tasks` | Поток `tasks-updated` |
 | `acquire-task-lock` / `release-task-lock` / `refresh-task-lock` | Блокировки |
 | `archive-done-tasks` / `get-archived-tasks` / `restore-archived-task` / `delete-archived-task` | Архив |
-| `get-task-history` / `add-task-comment` | История и комментарии |
+| `get-task-history` | История изменений задачи |
 | `get-task-types` / `save-task-types` / `subscribe-task-types` | Виды задач |
 | `get-task-priorities` / `save-task-priorities` / `subscribe-task-priorities` | Приоритеты |
 | `get-task-templates` / `save-task-templates` / `subscribe-task-templates` | Шаблоны |

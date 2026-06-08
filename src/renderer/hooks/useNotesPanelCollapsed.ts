@@ -40,5 +40,10 @@ export function useNotesPanelCollapsed(roomPath: string) {
     })
   }, [roomPath])
 
-  return { collapsed, toggleCollapsed, setCollapsed }
+  const setCollapsedPersisted = useCallback((next: boolean) => {
+    setCollapsed(next)
+    saveCollapsed(roomPath, next)
+  }, [roomPath])
+
+  return { collapsed, toggleCollapsed, setCollapsed: setCollapsedPersisted }
 }

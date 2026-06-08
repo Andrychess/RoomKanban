@@ -2,8 +2,6 @@ import { app } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import { computeMachineFingerprint } from '../identity/machineFingerprint'
-import type { ColumnSortId } from '../../shared/columnSort'
-import { defaultColumnSorts } from '../../shared/columnSort'
 import { defaultColumnCollapsed } from '../../shared/kanbanColumnCollapse'
 import type { AppSettings, AppTheme } from '../../shared/types'
 import type { TaskStatus } from '../../shared/taskStatus'
@@ -39,9 +37,6 @@ export class SettingsStore {
       }
       if (!this.settings.employeeBindings) {
         this.settings.employeeBindings = {}
-      }
-      if (!this.settings.kanbanColumnSort) {
-        this.settings.kanbanColumnSort = {}
       }
       if (!this.settings.kanbanColumnCollapsed) {
         this.settings.kanbanColumnCollapsed = {}
@@ -123,35 +118,6 @@ export class SettingsStore {
 
   getRecentRooms(): string[] {
     return this.settings?.lastOpenedRooms ?? []
-  }
-
-  getColumnSort(roomPath: string, column: TaskStatus): ColumnSortId {
-    const normalized = path.normalize(roomPath)
-    const saved = this.settings?.kanbanColumnSort?.[normalized]?.[column]
-    return saved ?? defaultColumnSorts()[column]
-  }
-
-  async setColumnSort(
-    roomPath: string,
-    column: TaskStatus,
-    sortId: ColumnSortId
-  ): Promise<void> {
-    const s = await this.load()
-    const normalized = path.normalize(roomPath)
-    if (!s.kanbanColumnSort) s.kanbanColumnSort = {}
-    if (!s.kanbanColumnSort[normalized]) {
-      s.kanbanColumnSort[normalized] = { ...defaultColumnSorts() }
-    }
-    s.kanbanColumnSort[normalized]![column] = sortId
-    await this.save()
-  }
-
-  getAllColumnSorts(roomPath: string): Record<TaskStatus, ColumnSortId> {
-    const base = defaultColumnSorts()
-    const normalized = path.normalize(roomPath)
-    const saved = this.settings?.kanbanColumnSort?.[normalized]
-    if (!saved) return base
-    return { ...base, ...saved }
   }
 
   getAllColumnCollapsed(roomPath: string): Record<TaskStatus, boolean> {

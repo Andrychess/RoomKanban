@@ -100,6 +100,10 @@ function buildMenu(): void {
           click: () => mainWindow?.webContents.send('navigate', 'calendar')
         },
         {
+          label: 'По сотрудникам',
+          click: () => mainWindow?.webContents.send('navigate', 'kanbanByEmployee')
+        },
+        {
           label: 'Состав комнаты',
           accelerator: 'CmdOrCtrl+Shift+T',
           click: () => mainWindow?.webContents.send('navigate', 'team')

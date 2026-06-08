@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import type { Employee, TaskPriority, TaskType } from '../../shared/types'
+import { useMemo } from 'react'
+import type { Employee, TaskType } from '../../shared/types'
 import { HintLabel } from './HintIcon'
 import { UI_HINTS } from '../hints/uiHints'
 import type { KanbanTaskFilters, OwnershipFilter } from '../hooks/useKanbanTaskFilters'
@@ -9,8 +9,8 @@ interface Props {
   filters: KanbanTaskFilters
   employees: Record<string, Employee>
   taskTypes: TaskType[]
-  taskPriorities: TaskPriority[]
   hasActiveFilters: boolean
+  hideOwnershipFilter?: boolean
   onChange: (next: KanbanTaskFilters) => void
   onReset: () => void
 }
@@ -25,13 +25,11 @@ export default function KanbanFilters({
   filters,
   employees,
   taskTypes,
-  taskPriorities,
   hasActiveFilters,
+  hideOwnershipFilter = false,
   onChange,
   onReset
 }: Props) {
-  const [open, setOpen] = useState(hasActiveFilters)
-
   const employeeOptions = useMemo(
     () =>
       Object.entries(employees)
@@ -41,108 +39,77 @@ export default function KanbanFilters({
   )
 
   return (
-    <div className={`kanban-filters-wrap ${open ? 'is-open' : ''}`}>
-      <TooltipWrap text={UI_HINTS.kanban.filterToggle}>
-        <button
-          type="button"
-          className={`kanban-filters-toggle ${hasActiveFilters ? 'has-active' : ''}`}
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-        >
-          {hasActiveFilters ? 'Фильтр включён' : 'Показать фильтр'}
-          <span className="kanban-filters-chevron" aria-hidden>
-            {open ? '▲' : '▼'}
-          </span>
-        </button>
-      </TooltipWrap>
+    <div className="kanban-filters-wrap">
+      <div className="kanban-filters" role="search" aria-label="Фильтр задач">
+        <label className="kanban-filter kanban-filter-search">
+          <HintLabel className="kanban-filter-label" topic="filters.search">
+            Поиск
+          </HintLabel>
+          <input
+            type="search"
+            value={filters.query}
+            placeholder="Название, описание, сотрудник…"
+            onChange={(e) => onChange({ ...filters, query: e.target.value })}
+          />
+        </label>
 
-      {open && (
-        <div className="kanban-filters" role="search" aria-label="Фильтр задач">
-          <label className="kanban-filter kanban-filter-search">
-            <HintLabel className="kanban-filter-label" topic="filters.search">
-              Поиск
-            </HintLabel>
-            <input
-              type="search"
-              value={filters.query}
-              placeholder="Название, описание, сотрудник…"
-              onChange={(e) => onChange({ ...filters, query: e.target.value })}
-            />
-          </label>
+        <label className="kanban-filter">
+          <HintLabel className="kanban-filter-label" topic="filters.type">
+            Вид задачи
+          </HintLabel>
+          <select
+            value={filters.typeId}
+            onChange={(e) => onChange({ ...filters, typeId: e.target.value })}
+          >
+            <option value="all">Любой</option>
+            {taskTypes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <label className="kanban-filter">
-            <HintLabel className="kanban-filter-label" topic="filters.priority">
-              Срочность
-            </HintLabel>
-            <select
-              value={filters.priorityId}
-              onChange={(e) => onChange({ ...filters, priorityId: e.target.value })}
-            >
-              <option value="all">Любая</option>
-              {taskPriorities.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+        {!hideOwnershipFilter && (
+        <label className="kanban-filter">
+          <HintLabel className="kanban-filter-label" topic="filters.ownership">
+            Кому назначено
+          </HintLabel>
+          <select
+            value={filters.ownership}
+            onChange={(e) =>
+              onChange({ ...filters, ownership: e.target.value as OwnershipFilter })
+            }
+          >
+            <optgroup label="Общее">
+              {OWNERSHIP_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
-            </select>
-          </label>
-
-          <label className="kanban-filter">
-            <HintLabel className="kanban-filter-label" topic="filters.type">
-              Вид задачи
-            </HintLabel>
-            <select
-              value={filters.typeId}
-              onChange={(e) => onChange({ ...filters, typeId: e.target.value })}
-            >
-              <option value="all">Любой</option>
-              {taskTypes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="kanban-filter">
-            <HintLabel className="kanban-filter-label" topic="filters.ownership">
-              Кому назначено
-            </HintLabel>
-            <select
-              value={filters.ownership}
-              onChange={(e) =>
-                onChange({ ...filters, ownership: e.target.value as OwnershipFilter })
-              }
-            >
-              <optgroup label="Общее">
-                {OWNERSHIP_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+            </optgroup>
+            {employeeOptions.length > 0 && (
+              <optgroup label="Сотрудники">
+                {employeeOptions.map((emp) => (
+                  <option key={emp.pcId} value={emp.pcId}>
+                    {emp.name}
+                    {emp.role ? ` · ${emp.role}` : ''}
                   </option>
                 ))}
               </optgroup>
-              {employeeOptions.length > 0 && (
-                <optgroup label="Сотрудники">
-                  {employeeOptions.map((emp) => (
-                    <option key={emp.pcId} value={emp.pcId}>
-                      {emp.name}
-                      {emp.role ? ` · ${emp.role}` : ''}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </label>
+            )}
+          </select>
+        </label>
+        )}
 
-          {hasActiveFilters && (
-            <TooltipWrap text={UI_HINTS.filters.reset}>
-              <button type="button" className="btn btn-ghost" onClick={onReset}>
-                Сбросить
-              </button>
-            </TooltipWrap>
-          )}
-        </div>
-      )}
+        {hasActiveFilters && (
+          <TooltipWrap text={UI_HINTS.filters.reset}>
+            <button type="button" className="btn btn-ghost kanban-filter-reset" onClick={onReset}>
+              Сбросить
+            </button>
+          </TooltipWrap>
+        )}
+      </div>
     </div>
   )
 }

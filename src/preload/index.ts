@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ColumnSortId } from '../shared/columnSort'
 import type { ChiefDashboardData } from '../shared/chiefDashboard'
 import type {
   AppTheme,
@@ -16,8 +15,6 @@ import type {
   TaskFileKind,
   TaskHistoryEntry,
   TaskLockResult,
-  TaskPriority,
-  TaskTemplate,
   TaskType,
   UpdateTaskInput
 } from '../shared/types'
@@ -49,12 +46,6 @@ export interface RoomKanbanApi {
   verifyRoomPassword: (folderPath: string, password: string) => Promise<boolean>
   setRoomPassword: (password: string | null) => Promise<Room>
   setEmployeePassword: (employeeKey: string, password: string | null) => Promise<Room>
-  getColumnSorts: (roomPath: string) => Promise<Record<TaskStatus, ColumnSortId>>
-  setColumnSort: (
-    roomPath: string,
-    column: TaskStatus,
-    sortId: ColumnSortId
-  ) => Promise<Record<TaskStatus, ColumnSortId>>
   getColumnCollapsed: (roomPath: string) => Promise<Record<TaskStatus, boolean>>
   setColumnCollapsed: (
     roomPath: string,
@@ -73,16 +64,15 @@ export interface RoomKanbanApi {
   getTaskTypes: () => Promise<TaskType[]>
   saveTaskTypes: (types: TaskType[]) => Promise<TaskType[]>
   subscribeTaskTypes: (callback: (types: TaskType[]) => void) => () => void
-  getTaskPriorities: () => Promise<TaskPriority[]>
-  saveTaskPriorities: (priorities: TaskPriority[]) => Promise<TaskPriority[]>
-  subscribeTaskPriorities: (callback: (priorities: TaskPriority[]) => void) => () => void
   getTasks: () => Promise<Task[]>
   createTask: (input: CreateTaskInput) => Promise<Task>
+  seedTestTasks: () => Promise<{ count: number }>
   updateTask: (input: UpdateTaskInput) => Promise<UpdateTaskResult>
   refreshRoomSync: () => Promise<{ refreshed_at: number }>
   onRoomSyncUpdated: (callback: (event: RoomSyncEvent) => void) => () => void
   onRoomDataRefreshed: (callback: () => void) => () => void
   updateTaskStatus: (taskId: string, status: Task['status']) => Promise<void>
+  updateTaskAssignee: (taskId: string, assigneePc: string) => Promise<void>
   clearDoneTasks: () => Promise<number>
   archiveDoneTasks: () => Promise<number>
   getArchivedTasks: () => Promise<Task[]>
@@ -90,11 +80,7 @@ export interface RoomKanbanApi {
   deleteTask: (taskId: string) => Promise<void>
   deleteArchivedTask: (taskId: string) => Promise<void>
   getTaskHistory: (taskId: string) => Promise<TaskHistoryEntry[]>
-  addTaskComment: (taskId: string, text: string) => Promise<Task>
   getChiefDashboard: () => Promise<ChiefDashboardData>
-  getTaskTemplates: () => Promise<TaskTemplate[]>
-  saveTaskTemplates: (templates: TaskTemplate[]) => Promise<TaskTemplate[]>
-  subscribeTaskTemplates: (callback: (templates: TaskTemplate[]) => void) => () => void
   getRoomNotes: () => Promise<RoomNote[]>
   addRoomNote: (title: string, text: string) => Promise<RoomNote>
   updateRoomNote: (noteId: string, title: string, text: string) => Promise<RoomNote>
@@ -149,9 +135,6 @@ const api: RoomKanbanApi = {
   setRoomPassword: (password) => ipcRenderer.invoke('set-room-password', password),
   setEmployeePassword: (employeeKey, password) =>
     ipcRenderer.invoke('set-employee-password', employeeKey, password),
-  getColumnSorts: (roomPath) => ipcRenderer.invoke('get-column-sorts', roomPath),
-  setColumnSort: (roomPath, column, sortId) =>
-    ipcRenderer.invoke('set-column-sort', roomPath, column, sortId),
   getColumnCollapsed: (roomPath) => ipcRenderer.invoke('get-column-collapsed', roomPath),
   setColumnCollapsed: (roomPath, column, collapsed) =>
     ipcRenderer.invoke('set-column-collapsed', roomPath, column, collapsed),
@@ -173,16 +156,9 @@ const api: RoomKanbanApi = {
     void ipcRenderer.invoke('subscribe-task-types')
     return () => ipcRenderer.removeListener('task-types-updated', handler)
   },
-  getTaskPriorities: () => ipcRenderer.invoke('get-task-priorities'),
-  saveTaskPriorities: (priorities) => ipcRenderer.invoke('save-task-priorities', priorities),
-  subscribeTaskPriorities: (callback) => {
-    const handler = (_: unknown, priorities: TaskPriority[]) => callback(priorities)
-    ipcRenderer.on('task-priorities-updated', handler)
-    void ipcRenderer.invoke('subscribe-task-priorities')
-    return () => ipcRenderer.removeListener('task-priorities-updated', handler)
-  },
   getTasks: () => ipcRenderer.invoke('get-tasks'),
   createTask: (input) => ipcRenderer.invoke('create-task', input),
+  seedTestTasks: () => ipcRenderer.invoke('seed-test-tasks'),
   updateTask: (input) => ipcRenderer.invoke('update-task', input),
   refreshRoomSync: () => ipcRenderer.invoke('refresh-room-sync'),
   onRoomSyncUpdated: (callback) => {
@@ -197,6 +173,8 @@ const api: RoomKanbanApi = {
   },
   updateTaskStatus: (taskId, status) =>
     ipcRenderer.invoke('update-task-status', taskId, status),
+  updateTaskAssignee: (taskId, assigneePc) =>
+    ipcRenderer.invoke('update-task-assignee', taskId, assigneePc),
   clearDoneTasks: () => ipcRenderer.invoke('clear-done-tasks'),
   archiveDoneTasks: () => ipcRenderer.invoke('archive-done-tasks'),
   getArchivedTasks: () => ipcRenderer.invoke('get-archived-tasks'),
@@ -204,16 +182,7 @@ const api: RoomKanbanApi = {
   deleteTask: (taskId) => ipcRenderer.invoke('delete-task', taskId),
   deleteArchivedTask: (taskId) => ipcRenderer.invoke('delete-archived-task', taskId),
   getTaskHistory: (taskId) => ipcRenderer.invoke('get-task-history', taskId),
-  addTaskComment: (taskId, text) => ipcRenderer.invoke('add-task-comment', taskId, text),
   getChiefDashboard: () => ipcRenderer.invoke('get-chief-dashboard'),
-  getTaskTemplates: () => ipcRenderer.invoke('get-task-templates'),
-  saveTaskTemplates: (templates) => ipcRenderer.invoke('save-task-templates', templates),
-  subscribeTaskTemplates: (callback) => {
-    const handler = (_: unknown, templates: TaskTemplate[]) => callback(templates)
-    ipcRenderer.on('task-templates-updated', handler)
-    void ipcRenderer.invoke('subscribe-task-templates')
-    return () => ipcRenderer.removeListener('task-templates-updated', handler)
-  },
   getRoomNotes: () => ipcRenderer.invoke('get-room-notes'),
   addRoomNote: (title, text) => ipcRenderer.invoke('add-room-note', title, text),
   updateRoomNote: (noteId, title, text) =>
