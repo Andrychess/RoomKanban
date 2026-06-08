@@ -25,20 +25,25 @@ npm run dev
 npm run dist
 ```
 
-Результат: `release/RoomKanban Setup 0.1.0.exe`. Иконка: `build/icon.png` (исходник — `assets/icon.png`).
+Перед сборкой **версия увеличивается автоматически** (patch: `0.1.0` → `0.1.1`). Номер берётся из `package.json` и попадает в имя установщика и в приложение.
+
+Результат: `release/RoomKanban Setup X.Y.Z.exe`. Иконка: `build/icon.png` (исходник — `assets/icon.png`).
+
+После сборки закоммитьте обновлённый `package.json`.
 
 ## Скрипты
 
 | Команда | Действие |
 |---------|----------|
 | `npm run dev` | Разработка |
-| `npm run build` | Сборка в `out/` |
-| `npm run dist` | Установщик `.exe` |
-| `npm run dist:publish` | Сборка + публикация в GitHub Releases |
+| `npm run build` | Сборка в `out/` (версию не меняет) |
+| `npm run dist` | Авто-версия + установщик `.exe` |
+| `npm run dist:publish` | Авто-версия + публикация в GitHub Releases |
+| `npm run version:show` | Показать текущую версию |
 | `npm run typecheck` | Проверка TypeScript |
 
 Подробности — в [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
 ## Версия
 
-**0.1.0** — см. `package.json`.
+Текущая: см. `package.json` (обновляется автоматически при `npm run dist`).

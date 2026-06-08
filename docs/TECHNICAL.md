@@ -122,9 +122,13 @@ npm run preview  # Electron с out/
 
 | Команда | Результат |
 |---------|-----------|
-| `npm run dist` | `build` + `electron-builder --win` → `release/RoomKanban Setup 0.1.0.exe` |
-| `npm run dist:dir` | Распакованная папка `release/win-unpacked/` (портативный запуск) |
-| `npm run dist:publish` | Сборка + публикация в GitHub Releases (нужен `GH_TOKEN`) |
+| `npm run build` | Сборка в `out/` (версию **не** меняет) |
+| `npm run dist` | Авто patch +1 в `package.json`, затем `build` + NSIS → `release/RoomKanban Setup X.Y.Z.exe` |
+| `npm run dist:dir` | Авто patch +1, распакованная папка `release/win-unpacked/` |
+| `npm run dist:publish` | Авто patch +1 + публикация в GitHub Releases (нужен `GH_TOKEN`) |
+| `npm run version:show` | Текущая версия без изменений |
+
+Скрипт `scripts/bump-version.mjs`: перед локальной сборкой увеличивает patch (`0.1.0` → `0.1.1`). В GitHub Actions при push тега `vX.Y.Z` версия **синхронизируется с тегом** без увеличения.
 
 **Данные комнаты не входят в установщик** — только бинарник приложения. Резервное копирование = копия всей папки комнаты.
 
@@ -137,13 +141,22 @@ npm run preview  # Electron с out/
 | UI | Кнопка **Обновить** в шапке + меню **Справка → Обновить приложение…** |
 | Проверка при старте | Через ~4 с после запуска (только packaged-сборка) |
 
-**Публикация новой версии для пользователей:**
+**Публикация новой версии для пользователей (GitHub Actions):**
 
-1. Поднять версию в `package.json` (например `0.2.0`).
-2. Закоммитить и создать тег: `git tag v0.2.0 && git push origin v0.2.0`
-3. GitHub Actions (`.github/workflows/release.yml`) соберёт `.exe` и опубликует Release с `latest.yml` для автообновления.
+1. Закоммитьте изменения в `main`.
+2. Создайте тег с нужной версией: `git tag v0.2.0 && git push origin v0.2.0`
+3. GitHub Actions синхронизирует версию с тегом, соберёт `.exe` и опубликует Release с `latest.yml`.
 
-Локальная публикация (без Actions):
+**Локальная сборка / публикация:**
+
+```bash
+npm run dist          # версия 0.1.0 → 0.1.1 автоматически
+npm run dist:publish  # то же + загрузка в GitHub Releases
+```
+
+После локальной сборки закоммитьте `package.json`. При публикации через `dist:publish` создайте тег `vX.Y.Z`, совпадающий с версией в `package.json`, чтобы CI и релизы оставались согласованными.
+
+Локальная публикация с токеном:
 
 ```bash
 set GH_TOKEN=ghp_...

@@ -1,15 +1,17 @@
 {
   "name": "room-kanban",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "RoomKanban — kanban with folder-based room sync",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "dist": "npm run build && electron-builder --win",
-    "dist:dir": "npm run build && electron-builder --win --dir",
-    "dist:publish": "npm run build && electron-builder --win --publish always",
+    "version:bump": "node scripts/bump-version.mjs",
+    "version:show": "node scripts/bump-version.mjs --no-bump",
+    "dist": "node scripts/bump-version.mjs && node scripts/clean-release.mjs && npm run build && electron-builder --win",
+    "dist:dir": "node scripts/bump-version.mjs && node scripts/clean-release.mjs && npm run build && electron-builder --win --dir",
+    "dist:publish": "node scripts/bump-version.mjs && node scripts/clean-release.mjs && npm run build && electron-builder --win --publish always",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "build": {
@@ -28,7 +30,9 @@
       {
         "from": "docs",
         "to": "docs",
-        "filter": ["**/*.md"]
+        "filter": [
+          "**/*.md"
+        ]
       },
       {
         "from": "build/icon.png",
