@@ -36,6 +36,9 @@ const MENU_SCREEN_MAP: Record<string, Screen> = {
   create: 'create',
   join: 'join',
   calendar: 'calendar',
+  kanban: 'kanban',
+  myTasks: 'myTasks',
+  myCalendar: 'myCalendar',
   kanbanByEmployee: 'kanbanByEmployee',
   team: 'team',
   overdue: 'overdue',
@@ -55,7 +58,9 @@ export default function App() {
 
   const inRoomView =
     room !== null &&
-    (screen === 'kanban' ||
+    (screen === 'myTasks' ||
+      screen === 'myCalendar' ||
+      screen === 'kanban' ||
       screen === 'kanbanByEmployee' ||
       screen === 'calendar' ||
       screen === 'team' ||
@@ -85,10 +90,10 @@ export default function App() {
     setRoom(r)
   }, [])
 
-  const goToKanban = useCallback(
+  const goToRoom = useCallback(
     (r: Room) => {
       setRoom(r)
-      navigate('kanban', { reset: true })
+      navigate('myTasks', { reset: true })
     },
     [navigate]
   )
@@ -119,14 +124,17 @@ export default function App() {
     void window.api.getCurrentRoom().then((r) => {
       if (r) {
         setRoom(r)
-        navigate('kanban', { reset: true })
+        navigate('myTasks', { reset: true })
       }
     })
 
     const unsubNav = window.api.onNavigate((s) => {
       if (
         s === 'calendar' ||
+        s === 'myCalendar' ||
+        s === 'kanban' ||
         s === 'kanbanByEmployee' ||
+        s === 'myTasks' ||
         s === 'team' ||
         s === 'overdue' ||
         s === 'dashboard' ||
@@ -136,7 +144,7 @@ export default function App() {
         void window.api.getCurrentRoom().then((r) => {
           if (r) {
             if ((s === 'overdue' || s === 'dashboard') && !r.isChief) {
-              navigate('kanban')
+              navigate('myTasks')
               return
             }
             setRoom(r)
@@ -154,7 +162,7 @@ export default function App() {
 
     const unsubAuto = window.api.onRoomAutoOpened((r) => {
       setRoom(r)
-      navigate('kanban', { reset: true })
+      navigate('myTasks', { reset: true })
     })
 
     const unsubClosed = window.api.onRoomClosed(() => {
@@ -263,8 +271,14 @@ export default function App() {
             <>
               <RoomTabs
                 active={
-                  screen === 'calendar'
-                    ? 'calendar'
+                  screen === 'myCalendar'
+                    ? 'myCalendar'
+                    : screen === 'myTasks'
+                      ? 'myTasks'
+                    : screen === 'calendar'
+                      ? 'calendar'
+                    : screen === 'kanban'
+                      ? 'kanban'
                     : screen === 'kanbanByEmployee'
                       ? 'kanbanByEmployee'
                     : screen === 'team'
@@ -277,7 +291,7 @@ export default function App() {
                             ? 'archive'
                             : screen === 'exchange'
                               ? 'exchange'
-                              : 'kanban'
+                              : 'myTasks'
                 }
                 isChief={room.isChief}
                 roomPath={room.path}
@@ -292,7 +306,7 @@ export default function App() {
       </header>
 
       <main
-        className={`app-main ${inRoomView ? 'room-view' : ''} ${screen === 'kanban' || screen === 'kanbanByEmployee' ? 'kanban' : ''} ${screen === 'calendar' ? 'calendar' : ''} ${screen === 'team' ? 'team' : ''} ${screen === 'overdue' ? 'overdue' : ''} ${screen === 'dashboard' ? 'dashboard' : ''} ${screen === 'archive' ? 'archive' : ''} ${screen === 'exchange' ? 'exchange' : ''}`}
+        className={`app-main ${inRoomView ? 'room-view' : ''} ${screen === 'kanban' || screen === 'myTasks' || screen === 'kanbanByEmployee' ? 'kanban' : ''} ${screen === 'calendar' || screen === 'myCalendar' ? 'calendar' : ''} ${screen === 'team' ? 'team' : ''} ${screen === 'overdue' ? 'overdue' : ''} ${screen === 'dashboard' ? 'dashboard' : ''} ${screen === 'archive' ? 'archive' : ''} ${screen === 'exchange' ? 'exchange' : ''}`}
       >
         {screen === 'welcome' && (
           <WelcomeScreen
@@ -322,10 +336,27 @@ export default function App() {
           />
         )}
         {screen === 'create' && (
-          <CreateRoomScreen initialFolder={createFolder} onCreated={goToKanban} />
+          <CreateRoomScreen initialFolder={createFolder} onCreated={goToRoom} />
         )}
         {screen === 'join' && (
-          <JoinRoomScreen initialFolder={joinFolder} onJoined={goToKanban} />
+          <JoinRoomScreen initialFolder={joinFolder} onJoined={goToRoom} />
+        )}
+        {screen === 'myTasks' && room && (
+          <KanbanScreen
+            room={room}
+            tasks={roomTasks}
+            scope="mine"
+            onTasksChange={refreshRoomTasks}
+            tasksLoadError={roomTasksLoadError}
+          />
+        )}
+        {screen === 'myCalendar' && room && (
+          <CalendarScreen
+            room={room}
+            tasks={roomTasks}
+            scope="mine"
+            onTasksChange={refreshRoomTasks}
+          />
         )}
         {screen === 'kanban' && room && (
           <KanbanScreen

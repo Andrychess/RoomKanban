@@ -5,6 +5,8 @@ import TooltipWrap from './TooltipWrap'
 import { UI_HINTS } from '../hints/uiHints'
 
 type RoomTabId =
+  | 'myTasks'
+  | 'myCalendar'
   | 'kanban'
   | 'kanbanByEmployee'
   | 'calendar'
@@ -25,17 +27,19 @@ interface Props {
 }
 
 const PRIMARY_TABS: { id: RoomTabId; label: string; screen: Screen }[] = [
-  { id: 'kanban', label: 'Задачи', screen: 'kanban' },
-  { id: 'kanbanByEmployee', label: 'По сотрудникам', screen: 'kanbanByEmployee' },
-  { id: 'calendar', label: 'Календарь', screen: 'calendar' }
+  { id: 'myTasks', label: 'Мои задачи', screen: 'myTasks' },
+  { id: 'myCalendar', label: 'Мой календарь', screen: 'myCalendar' }
 ]
 
-const MORE_TABS: {
+const MANAGEMENT_TABS: {
   id: RoomTabId
   label: string
   screen: Screen
   chiefOnly?: boolean
 }[] = [
+  { id: 'kanban', label: 'Все задачи', screen: 'kanban' },
+  { id: 'kanbanByEmployee', label: 'По сотрудникам', screen: 'kanbanByEmployee' },
+  { id: 'calendar', label: 'Календарь комнаты', screen: 'calendar' },
   { id: 'team', label: 'Сотрудники', screen: 'team' },
   { id: 'exchange', label: 'Обмен', screen: 'exchange' },
   { id: 'archive', label: 'Архив', screen: 'archive' },
@@ -43,9 +47,9 @@ const MORE_TABS: {
   { id: 'overdue', label: 'Просрочено', screen: 'overdue', chiefOnly: true }
 ]
 
-const MORE_TAB_IDS = new Set<RoomTabId>(MORE_TABS.map((tab) => tab.id))
+const MANAGEMENT_TAB_IDS = new Set<RoomTabId>(MANAGEMENT_TABS.map((tab) => tab.id))
 
-function moreTabLabel(tab: (typeof MORE_TABS)[number], overdueCount: number): string {
+function managementTabLabel(tab: (typeof MANAGEMENT_TABS)[number], overdueCount: number): string {
   if (tab.id === 'overdue' && overdueCount > 0) {
     return `Просрочено (${overdueCount})`
   }
@@ -64,9 +68,9 @@ export default function RoomTabs({
   const [menuOpen, setMenuOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const moreActive = MORE_TAB_IDS.has(active)
+  const managementActive = MANAGEMENT_TAB_IDS.has(active)
 
-  const moreTabs = MORE_TABS.filter((tab) => !tab.chiefOnly || isChief)
+  const managementTabs = MANAGEMENT_TABS.filter((tab) => !tab.chiefOnly || isChief)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -107,6 +111,11 @@ export default function RoomTabs({
     onSeedTestTasks?.()
   }
 
+  function openNotes() {
+    setMenuOpen(false)
+    setNotesOpen(true)
+  }
+
   return (
     <nav className="room-tabs" aria-label="Разделы">
       {PRIMARY_TABS.map((tab) => (
@@ -121,22 +130,11 @@ export default function RoomTabs({
         </TooltipWrap>
       ))}
 
-      <RoomNotesPanel
-        roomPath={roomPath}
-        inline
-        open={notesOpen}
-        onOpenChange={(open) => {
-          setNotesOpen(open)
-          if (open) setMenuOpen(false)
-        }}
-      />
-
-      <div className="room-tabs-more" ref={menuRef}>
-        <TooltipWrap text="Остальные разделы: сотрудники, обмен, архив, виды задач и отчёты">
+      <div className="room-tabs-management" ref={menuRef}>
+        <TooltipWrap text="Все задачи комнаты, сотрудники, архив, заметки и настройки">
           <button
             type="button"
-            className={`room-tab-more-btn ${moreActive ? 'active' : ''} ${menuOpen ? 'is-open' : ''}`}
-            aria-label="Другие разделы"
+            className={`room-tab room-tab-management ${managementActive ? 'active' : ''} ${menuOpen || notesOpen ? 'is-open' : ''}`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => {
@@ -144,18 +142,21 @@ export default function RoomTabs({
               if (!menuOpen) setNotesOpen(false)
             }}
           >
-            <span className="room-tab-more-icon" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-            </span>
+            Управление комнатой
           </button>
         </TooltipWrap>
 
+        <RoomNotesPanel
+          roomPath={roomPath}
+          inline
+          hideTab
+          open={notesOpen}
+          onOpenChange={setNotesOpen}
+        />
+
         {menuOpen && (
-          <div className="room-tabs-menu" role="menu">
-            {moreTabs.map((tab) => (
+          <div className="room-tabs-menu room-tabs-menu--management" role="menu">
+            {managementTabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -164,9 +165,19 @@ export default function RoomTabs({
                 title={UI_HINTS.tabs[tab.id]}
                 onClick={() => selectScreen(tab.screen)}
               >
-                {moreTabLabel(tab, overdueCount)}
+                {managementTabLabel(tab, overdueCount)}
               </button>
             ))}
+            <div className="room-tabs-menu-sep" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              className="room-tabs-menu-item"
+              title="Общие заметки отдела"
+              onClick={openNotes}
+            >
+              Заметки
+            </button>
             {isChief && (onOpenTaskTypes || onSeedTestTasks) && (
               <>
                 <div className="room-tabs-menu-sep" role="separator" />

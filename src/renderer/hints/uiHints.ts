@@ -2,10 +2,13 @@ import type { HintTopicKey } from '../../shared/helpAnchors'
 
 /** Краткие тексты всплывающих подсказок (иконка «?» и title). */
 export const HINT_SHORT: Record<HintTopicKey, string> = {
-  'tabs.kanban': 'Доска с колонками: перетаскивайте карточки или меняйте этап внизу.',
+  'tabs.myTasks':
+    'Ваши задачи по этапам канбана: перетаскивайте карточки или меняйте этап кубиками.',
+  'tabs.myCalendar': 'Календарь только ваших задач. Клик по дню — новая задача.',
+  'tabs.kanban': 'Все задачи комнаты по этапам — раздел управления.',
   'tabs.kanbanByEmployee':
-    'Доска по сотрудникам: колонка — ответственный, внутри задачи по этапам и видам.',
-  'tabs.calendar': 'Календарь по срокам выполнения. Клик по дню — новая задача.',
+    'Доска по сотрудникам: колонка — ответственный.',
+  'tabs.calendar': 'Календарь всех задач комнаты по срокам.',
   'tabs.team': 'Состав отдела: имена, роли и пароли для входа в комнату.',
   'tabs.exchange': 'Быстрая передача файлов между сотрудниками без привязки к задаче.',
   'tabs.archive': 'Выполненные задачи с доски. Можно вернуть или удалить навсегда.',
@@ -57,6 +60,8 @@ export const HINT_SHORT: Record<HintTopicKey, string> = {
 /** @deprecated Используйте HINT_SHORT и topic в HintIcon */
 export const UI_HINTS = {
   tabs: {
+    myTasks: HINT_SHORT['tabs.myTasks'],
+    myCalendar: HINT_SHORT['tabs.myCalendar'],
     kanban: HINT_SHORT['tabs.kanban'],
     kanbanByEmployee: HINT_SHORT['tabs.kanbanByEmployee'],
     calendar: HINT_SHORT['tabs.calendar'],

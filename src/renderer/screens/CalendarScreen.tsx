@@ -20,9 +20,20 @@ interface Props {
   room: Room
   tasks: Task[]
   onTasksChange: () => void
+  scope?: 'all' | 'mine'
 }
 
-export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
+export default function CalendarScreen({
+  room,
+  tasks,
+  onTasksChange,
+  scope = 'all'
+}: Props) {
+  const scopedTasks = useMemo(() => {
+    if (scope !== 'mine') return tasks
+    return tasks.filter((task) => task.assignee_pc === room.pcId)
+  }, [tasks, scope, room.pcId])
+
   const { types: taskTypes } = useTaskTypes()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
@@ -36,7 +47,7 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
 
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>()
-    for (const task of tasks) {
+    for (const task of scopedTasks) {
       const day = dueDateOnly(task.due_date)
       if (!day) continue
       const list = map.get(day) ?? []
@@ -47,11 +58,14 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
       list.sort((a, b) => a.title.localeCompare(b.title, 'ru'))
     }
     return map
-  }, [tasks])
+  }, [scopedTasks])
 
   const unscheduled = useMemo(
-    () => tasks.filter((t) => !t.due_date).sort((a, b) => a.title.localeCompare(b.title, 'ru')),
-    [tasks]
+    () =>
+      scopedTasks
+        .filter((t) => !t.due_date)
+        .sort((a, b) => a.title.localeCompare(b.title, 'ru')),
+    [scopedTasks]
   )
 
   function prevMonth() {
@@ -177,8 +191,13 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
                         </span>
                         <span className="calendar-task-title">{task.title}</span>
                         <span className="calendar-task-meta">
-                          {assignee?.name} · {room.state.employees[task.created_by_pc]?.name ?? '—'}{' '}
-                          · {STATUS_LABELS[task.status]}
+                          {scope === 'all' && (
+                            <>
+                              {assignee?.name} ·{' '}
+                            </>
+                          )}
+                          {room.state.employees[task.created_by_pc]?.name ?? '—'} ·{' '}
+                          {STATUS_LABELS[task.status]}
                         </span>
                       </button>
                     </li>
@@ -211,8 +230,12 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
                     </span>
                     <strong>{task.title}</strong>
                     <span>
-                      {room.state.employees[task.assignee_pc]?.name ?? '—'} · создал{' '}
-                      {room.state.employees[task.created_by_pc]?.name ?? '—'} ·{' '}
+                      {scope === 'all' && (
+                        <>
+                          {room.state.employees[task.assignee_pc]?.name ?? '—'} ·{' '}
+                        </>
+                      )}
+                      создал {room.state.employees[task.created_by_pc]?.name ?? '—'} ·{' '}
                       {STATUS_LABELS[task.status]}
                     </span>
                   </button>
@@ -244,6 +267,7 @@ export default function CalendarScreen({ room, tasks, onTasksChange }: Props) {
           mode={editorMode}
           defaultStatus="review"
           defaultDueDate={createDueDate}
+          defaultAssigneePc={scope === 'mine' ? room.pcId : undefined}
           onClose={() => setEditorOpen(false)}
           onSaved={onTasksChange}
         />

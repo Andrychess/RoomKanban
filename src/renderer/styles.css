@@ -2025,9 +2025,31 @@ body {
   cursor: pointer;
 }
 
-.room-tabs-more {
+.room-tabs-management {
   position: relative;
-  margin-left: 2px;
+  margin-left: auto;
+}
+
+.room-tab-management {
+  font-weight: 600;
+}
+
+.room-tab-management.is-open,
+.room-tab-management.active {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.room-tabs-menu--management {
+  right: 0;
+  left: auto;
+  min-width: 220px;
+}
+
+.room-notes-inline--menu .room-notes-popover {
+  right: 0;
+  left: auto;
 }
 
 .room-tab-more-btn {

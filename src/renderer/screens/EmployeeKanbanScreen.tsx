@@ -10,7 +10,7 @@ import KanbanFilters from '../components/KanbanFilters'
 import TooltipWrap from '../components/TooltipWrap'
 import { UI_HINTS } from '../hints/uiHints'
 import { useCollapsedTaskCards } from '../hooks/useCollapsedTaskCards'
-import { useEmployeeKanbanColumnCollapse } from '../hooks/useEmployeeKanbanColumnCollapse'
+import { useBoardColumnCollapse } from '../hooks/useBoardColumnCollapse'
 import TaskCard from '../components/TaskCard'
 import TaskEditor, { type TaskEditorMode } from '../components/TaskEditor'
 import { useKanbanTaskFilters } from '../hooks/useKanbanTaskFilters'
@@ -23,6 +23,8 @@ interface Props {
   tasksLoadError?: string | null
 }
 
+const EMPLOYEE_COLUMN_COLLAPSE_KEY = 'roomKanban:employeeKanbanColumnCollapsed'
+
 export default function EmployeeKanbanScreen({
   room,
   tasks,
@@ -32,8 +34,9 @@ export default function EmployeeKanbanScreen({
   const { types: taskTypes } = useTaskTypes()
   const { filters, setFilters, filteredTasks, hasActiveFilters, resetFilters } =
     useKanbanTaskFilters(tasks, room.pcId, room.state.employees)
-  const { collapsed, toggleColumnCollapsed, expandColumn } = useEmployeeKanbanColumnCollapse(
-    room.path
+  const { collapsed, toggleColumnCollapsed, expandColumn } = useBoardColumnCollapse(
+    room.path,
+    EMPLOYEE_COLUMN_COLLAPSE_KEY
   )
   const { isTaskCollapsed, toggleTaskCollapsed } = useCollapsedTaskCards(room.path)
 

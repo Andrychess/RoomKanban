@@ -95,13 +95,26 @@ function buildMenu(): void {
       label: 'Вид',
       submenu: [
         {
-          label: 'Календарь',
-          accelerator: 'CmdOrCtrl+Shift+C',
-          click: () => mainWindow?.webContents.send('navigate', 'calendar')
+          label: 'Мои задачи',
+          click: () => mainWindow?.webContents.send('navigate', 'myTasks')
+        },
+        {
+          label: 'Мой календарь',
+          click: () => mainWindow?.webContents.send('navigate', 'myCalendar')
+        },
+        { type: 'separator' },
+        {
+          label: 'Все задачи',
+          click: () => mainWindow?.webContents.send('navigate', 'kanban')
         },
         {
           label: 'По сотрудникам',
           click: () => mainWindow?.webContents.send('navigate', 'kanbanByEmployee')
+        },
+        {
+          label: 'Календарь комнаты',
+          accelerator: 'CmdOrCtrl+Shift+C',
+          click: () => mainWindow?.webContents.send('navigate', 'calendar')
         },
         {
           label: 'Состав комнаты',

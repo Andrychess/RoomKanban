@@ -32,6 +32,7 @@ interface Props {
   defaultStatus: Task['status']
   defaultDueDate?: string | null
   defaultAssigneePc?: string
+  defaultTypeId?: string
   readOnlyArchived?: boolean
   onClose: () => void
   onSaved: () => void
@@ -53,6 +54,7 @@ export default function TaskEditor({
   defaultStatus,
   defaultDueDate = null,
   defaultAssigneePc,
+  defaultTypeId,
   readOnlyArchived = false,
   onClose,
   onSaved
@@ -69,7 +71,9 @@ export default function TaskEditor({
   const [assigneePc, setAssigneePc] = useState(
     task?.assignee_pc ?? defaultAssigneePc ?? currentPcId
   )
-  const [typeId, setTypeId] = useState(task?.type_id ?? taskTypes[0]?.id ?? DEFAULT_TYPE_ID)
+  const [typeId, setTypeId] = useState(
+    task?.type_id ?? defaultTypeId ?? taskTypes[0]?.id ?? DEFAULT_TYPE_ID
+  )
   const [status, setStatus] = useState<Task['status']>(task?.status ?? defaultStatus)
   const initialDue = splitDueDateTime(task?.due_date ?? defaultDueDate ?? null)
   const [dueDatePart, setDueDatePart] = useState(initialDue.date)

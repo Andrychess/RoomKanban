@@ -6,6 +6,8 @@ export type Screen =
   | 'create'
   | 'join'
   | 'kanban'
+  | 'myTasks'
+  | 'myCalendar'
   | 'kanbanByEmployee'
   | 'calendar'
   | 'team'
@@ -20,8 +22,10 @@ export const SCREEN_LABELS: Record<Screen, string> = {
   create: 'Новая комната',
   join: 'Вход в комнату',
   kanban: 'Канбан-доска',
+  myTasks: 'Мои задачи',
+  myCalendar: 'Мой календарь',
   kanbanByEmployee: 'По сотрудникам',
-  calendar: 'Календарь',
+  calendar: 'Календарь комнаты',
   team: 'Состав комнаты',
   overdue: 'Просрочено',
   dashboard: 'Сводка',

@@ -44,6 +44,8 @@ export type TechHelpAnchorId = (typeof TECH_HELP_ANCHORS)[keyof typeof TECH_HELP
 
 /** Ключи подсказок «?» в интерфейсе → раздел руководства пользователя. */
 export const HINT_DOC_MAP = {
+  'tabs.myTasks': USER_HELP_ANCHORS.kanban,
+  'tabs.myCalendar': USER_HELP_ANCHORS.dueDateTime,
   'tabs.kanban': USER_HELP_ANCHORS.kanban,
   'tabs.kanbanByEmployee': USER_HELP_ANCHORS.kanban,
   'tabs.calendar': USER_HELP_ANCHORS.sections,

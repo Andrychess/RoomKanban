@@ -8,6 +8,8 @@ interface Props {
   roomPath: string
   /** В одной строке с вкладками «Задачи» / «Календарь». */
   inline?: boolean
+  /** Не показывать кнопку «Заметки» — открытие только из меню. */
+  hideTab?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
@@ -24,6 +26,7 @@ function emptyDraft(): NoteDraft {
 export default function RoomNotesPanel({
   roomPath,
   inline = false,
+  hideTab = false,
   open: openControlled,
   onOpenChange
 }: Props) {
@@ -254,19 +257,24 @@ export default function RoomNotesPanel({
 
   if (inline) {
     return (
-      <div className="room-notes-inline" ref={panelRef}>
-        <TooltipWrap text="Общие заметки отдела — напоминания и важная информация">
-          <button
-            type="button"
-            className={`room-tab room-notes-tab ${expanded ? 'active is-open' : ''}`}
-            aria-expanded={expanded}
-            aria-haspopup="dialog"
-            onClick={handleToggleExpanded}
-          >
-            Заметки
-            <span className="room-notes-count">{notes.length}</span>
-          </button>
-        </TooltipWrap>
+      <div
+        className={`room-notes-inline ${hideTab ? 'room-notes-inline--menu' : ''}`}
+        ref={panelRef}
+      >
+        {!hideTab && (
+          <TooltipWrap text="Общие заметки отдела — напоминания и важная информация">
+            <button
+              type="button"
+              className={`room-tab room-notes-tab ${expanded ? 'active is-open' : ''}`}
+              aria-expanded={expanded}
+              aria-haspopup="dialog"
+              onClick={handleToggleExpanded}
+            >
+              Заметки
+              <span className="room-notes-count">{notes.length}</span>
+            </button>
+          </TooltipWrap>
+        )}
 
         {expanded && (
           <div className="room-notes-popover" role="dialog" aria-label="Заметки комнаты">

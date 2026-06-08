@@ -18,17 +18,24 @@ interface Props {
   tasks: Task[]
   onTasksChange: () => void
   tasksLoadError?: string | null
+  scope?: 'all' | 'mine'
 }
 
 export default function KanbanScreen({
   room,
   tasks,
   onTasksChange,
-  tasksLoadError = null
+  tasksLoadError = null,
+  scope = 'all'
 }: Props) {
+  const scopedTasks = useMemo(() => {
+    if (scope !== 'mine') return tasks
+    return tasks.filter((task) => task.assignee_pc === room.pcId)
+  }, [tasks, scope, room.pcId])
+
   const { types: taskTypes } = useTaskTypes()
   const { filters, setFilters, filteredTasks, hasActiveFilters, resetFilters } =
-    useKanbanTaskFilters(tasks, room.pcId, room.state.employees)
+    useKanbanTaskFilters(scopedTasks, room.pcId, room.state.employees)
   const { collapsed, toggleColumnCollapsed, expandColumn } = useKanbanColumnCollapse(room.path)
   const { isTaskCollapsed, toggleTaskCollapsed } = useCollapsedTaskCards(room.path)
 
@@ -41,8 +48,8 @@ export default function KanbanScreen({
   const [archivingDone, setArchivingDone] = useState(false)
 
   const doneCount = useMemo(
-    () => tasks.filter((t) => t.status === 'done').length,
-    [tasks]
+    () => scopedTasks.filter((t) => t.status === 'done').length,
+    [scopedTasks]
   )
 
   function openCreate(status: Task['status']) {
@@ -112,6 +119,7 @@ export default function KanbanScreen({
         employees={room.state.employees}
         taskTypes={taskTypes}
         hasActiveFilters={hasActiveFilters}
+        hideOwnershipFilter={scope === 'mine'}
         onChange={setFilters}
         onReset={resetFilters}
       />
@@ -124,7 +132,7 @@ export default function KanbanScreen({
             filteredTasks.filter((t) => t.status === col.id),
             taskTypes
           )
-          const totalInColumn = tasks.filter((t) => t.status === col.id).length
+          const totalInColumn = scopedTasks.filter((t) => t.status === col.id).length
           const countLabel =
             hasActiveFilters && totalInColumn !== columnTasks.length
               ? `${columnTasks.length}/${totalInColumn}`
@@ -224,6 +232,7 @@ export default function KanbanScreen({
                     taskTypes={taskTypes}
                     assignee={room.state.employees[task.assignee_pc]}
                     columnAccent={theme.accent}
+                    hideAssignee={scope === 'mine'}
                     isCollapsed={isTaskCollapsed(task.id)}
                     onToggleCollapse={() => toggleTaskCollapsed(task.id)}
                     onViewDetails={openViewDetails}
@@ -260,6 +269,7 @@ export default function KanbanScreen({
           task={editingTask}
           mode={editorMode}
           defaultStatus={defaultStatus}
+          defaultAssigneePc={scope === 'mine' && !editingTask ? room.pcId : undefined}
           onClose={() => setEditorOpen(false)}
           onSaved={onTasksChange}
         />
