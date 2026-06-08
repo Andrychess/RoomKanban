@@ -10,14 +10,21 @@ function humanizeUpdateError(err: unknown): string {
   if (lower.includes('net') || lower.includes('enotfound') || lower.includes('network')) {
     return 'Нет подключения к интернету. Проверьте сеть и попробуйте снова.'
   }
-  if (lower.includes('404') || lower.includes('latest.yml')) {
-    return 'Обновления пока не опубликованы. Попробуйте позже.'
+  if (
+    lower.includes('404') ||
+    lower.includes('not found') ||
+    lower.includes('latest.yml') ||
+    lower.includes('cannot find') ||
+    lower.includes('no published') ||
+    lower.includes('releases/download')
+  ) {
+    return 'Обновления ещё не опубликованы на GitHub. Попросите IT выполнить первую публикацию релиза (npm run dist:publish или git tag vX.Y.Z).'
   }
   if (lower.includes('401') || lower.includes('403')) {
-    return 'Не удалось получить доступ к серверу обновлений.'
+    return 'Не удалось получить доступ к серверу обновлений. Репозиторий может быть приватным — нужна настройка доступа.'
   }
 
-  return 'Не удалось проверить обновления. Попробуйте позже.'
+  return 'Не удалось проверить обновления. Обратитесь к IT-администратору.'
 }
 
 export class AppUpdater {
@@ -88,6 +95,8 @@ export class AppUpdater {
 
     autoUpdater.on('error', (err) => {
       this.userInitiatedFlow = false
+      const raw = err instanceof Error ? err.message : String(err)
+      console.error('[app-update]', raw)
       this.patchStatus({
         phase: 'error',
         progress: undefined,
