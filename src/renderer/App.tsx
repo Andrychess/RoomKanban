@@ -14,6 +14,7 @@ import CalendarScreen from './screens/CalendarScreen'
 import TeamScreen from './screens/TeamScreen'
 import OverdueReportScreen from './screens/OverdueReportScreen'
 import ChiefDashboardScreen from './screens/ChiefDashboardScreen'
+import DepartmentMailScreen from './screens/DepartmentMailScreen'
 import ArchiveScreen from './screens/ArchiveScreen'
 import ExchangeScreen from './screens/ExchangeScreen'
 import ThemeToggle from './components/ThemeToggle'
@@ -44,7 +45,8 @@ const MENU_SCREEN_MAP: Record<string, Screen> = {
   overdue: 'overdue',
   dashboard: 'dashboard',
   archive: 'archive',
-  exchange: 'exchange'
+  exchange: 'exchange',
+  departmentMail: 'departmentMail'
 }
 
 export default function App() {
@@ -67,7 +69,8 @@ export default function App() {
       screen === 'overdue' ||
       screen === 'dashboard' ||
       screen === 'archive' ||
-      screen === 'exchange')
+      screen === 'exchange' ||
+      screen === 'departmentMail')
 
   const {
     tasks: roomTasks,
@@ -139,11 +142,15 @@ export default function App() {
         s === 'overdue' ||
         s === 'dashboard' ||
         s === 'archive' ||
-        s === 'exchange'
+        s === 'exchange' ||
+        s === 'departmentMail'
       ) {
         void window.api.getCurrentRoom().then((r) => {
           if (r) {
-            if ((s === 'overdue' || s === 'dashboard') && !r.isChief) {
+            if (
+              (s === 'overdue' || s === 'dashboard' || s === 'departmentMail') &&
+              !r.isChief
+            ) {
               navigate('myTasks')
               return
             }
@@ -287,11 +294,15 @@ export default function App() {
                         ? 'overdue'
                         : screen === 'dashboard'
                           ? 'dashboard'
+                          : screen === 'departmentMail'
+                            ? 'departmentMail'
                           : screen === 'archive'
                             ? 'archive'
                             : screen === 'exchange'
                               ? 'exchange'
-                              : 'myTasks'
+                              : screen === 'departmentMail'
+                                ? 'departmentMail'
+                                : 'myTasks'
                 }
                 isChief={room.isChief}
                 roomPath={room.path}
@@ -306,7 +317,7 @@ export default function App() {
       </header>
 
       <main
-        className={`app-main ${inRoomView ? 'room-view' : ''} ${screen === 'kanban' || screen === 'myTasks' || screen === 'kanbanByEmployee' ? 'kanban' : ''} ${screen === 'calendar' || screen === 'myCalendar' ? 'calendar' : ''} ${screen === 'team' ? 'team' : ''} ${screen === 'overdue' ? 'overdue' : ''} ${screen === 'dashboard' ? 'dashboard' : ''} ${screen === 'archive' ? 'archive' : ''} ${screen === 'exchange' ? 'exchange' : ''}`}
+        className={`app-main ${inRoomView ? 'room-view' : ''} ${screen === 'kanban' || screen === 'myTasks' || screen === 'kanbanByEmployee' ? 'kanban' : ''} ${screen === 'calendar' || screen === 'myCalendar' ? 'calendar' : ''} ${screen === 'team' ? 'team' : ''} ${screen === 'overdue' ? 'overdue' : ''} ${screen === 'dashboard' ? 'dashboard' : ''} ${screen === 'archive' ? 'archive' : ''} ${screen === 'exchange' ? 'exchange' : ''} ${screen === 'departmentMail' ? 'department-mail' : ''}`}
       >
         {screen === 'welcome' && (
           <WelcomeScreen
@@ -387,8 +398,12 @@ export default function App() {
           <ChiefDashboardScreen
             room={room}
             onOpenOverdue={() => navigate('overdue', { replace: true })}
+            onOpenMail={() => navigate('departmentMail', { replace: true })}
             onTasksChanged={refreshRoomTasks}
           />
+        )}
+        {screen === 'departmentMail' && room && room.isChief && (
+          <DepartmentMailScreen room={room} onTasksChanged={refreshRoomTasks} />
         )}
         {screen === 'archive' && room && (
           <ArchiveScreen room={room} onTasksChanged={refreshRoomTasks} />

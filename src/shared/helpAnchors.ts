@@ -54,6 +54,7 @@ export const HINT_DOC_MAP = {
   'tabs.archive': USER_HELP_ANCHORS.archive,
   'tabs.dashboard': USER_HELP_ANCHORS.sections,
   'tabs.overdue': USER_HELP_ANCHORS.overdue,
+  'tabs.departmentMail': USER_HELP_ANCHORS.sections,
   'roomBar.sync': USER_HELP_ANCHORS.syncRefresh,
   'roomBar.leave': USER_HELP_ANCHORS.sections,
   'kanban.newTask': USER_HELP_ANCHORS.kanban,

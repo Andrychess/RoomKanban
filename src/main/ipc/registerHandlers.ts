@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { RoomError, RoomManager } from '../room/RoomManager'
 import { SettingsStore } from '../settings/SettingsStore'
 import { BoardSyncManager } from '../sync/BoardSyncManager'
@@ -10,6 +10,24 @@ import { TaskHistoryStore } from '../sync/TaskHistoryStore'
 import { TaskPrioritiesStore } from '../sync/TaskPrioritiesStore'
 import { TaskTemplatesStore } from '../sync/TaskTemplatesStore'
 import { ReminderSettingsStore } from '../sync/ReminderSettingsStore'
+import { DepartmentMailSettingsStore } from '../sync/DepartmentMailSettingsStore'
+import { DepartmentMailInboxStore } from '../sync/DepartmentMailInboxStore'
+import { testImapConnection } from '../mail/testImapConnection'
+import { fetchMailMessagesForPeriod } from '../mail/fetchMailMessages'
+import { loadMailMessageBody } from '../mail/loadMailMessageBody'
+import {
+  clearMailAttachmentPreviewCache,
+  resolveMailAttachmentForPreview
+} from '../mail/mailAttachmentPreviewCache'
+import { prepareMailTaskDraft, cleanupMailTaskDraftTemp } from '../mail/prepareMailTaskDraft'
+import { formatMailError } from '../mail/imapClient'
+import { openLocalFilePreview } from '../preview/openLocalFilePreview'
+import type {
+  DepartmentMailConnectionInput,
+  DepartmentMailSettings,
+  FetchDepartmentMailPeriodInput,
+  MailTaskDraftProgress
+} from '../../shared/departmentMail'
 import { ExchangeStore } from '../sync/ExchangeStore'
 import { NotesStore } from '../sync/NotesStore'
 import { refreshRoomSync } from '../sync/refreshRoomSync'
@@ -42,6 +60,9 @@ let taskPrioritiesStore: TaskPrioritiesStore | null = null
 let taskHistoryStore: TaskHistoryStore | null = null
 let taskTemplatesStore: TaskTemplatesStore | null = null
 let reminderSettingsStore: ReminderSettingsStore | null = null
+let departmentMailSettingsStore: DepartmentMailSettingsStore | null = null
+let departmentMailInboxStore: DepartmentMailInboxStore | null = null
+const mailDraftTempDirs = new Map<string, string>()
 let reminderScheduler: ReminderScheduler | null = null
 let exchangeStore: ExchangeStore | null = null
 let notesStore: NotesStore | null = null
@@ -105,6 +126,12 @@ async function startRoomSync(room: Room, roomManager: RoomManager): Promise<void
 
   reminderSettingsStore = new ReminderSettingsStore(room.path)
   await reminderSettingsStore.ensureDefaults()
+
+  departmentMailSettingsStore = new DepartmentMailSettingsStore(room.path)
+  await departmentMailSettingsStore.ensureDefaults()
+
+  departmentMailInboxStore = new DepartmentMailInboxStore(room.path)
+  await departmentMailInboxStore.ensureDefaults()
 
   reminderScheduler = new ReminderScheduler(
     () => roomManager.getCurrentRoom(),
@@ -576,6 +603,219 @@ export function registerHandlers(
     return reminderSettingsStore.saveSettings(settings)
   })
 
+  ipcMain.handle('get-department-mail-settings', async () => {
+    if (!departmentMailSettingsStore) {
+      return {
+        enabled: false,
+        host: '',
+        port: 993,
+        secure: true,
+        user: '',
+        updated_at: 0
+      } satisfies DepartmentMailSettings
+    }
+    return departmentMailSettingsStore.getSettings()
+  })
+
+  ipcMain.handle('save-department-mail-settings', async (_e, settings: DepartmentMailSettings) => {
+    requireChief(requireOpenRoom())
+    if (!departmentMailSettingsStore) throw new Error('Комната не открыта')
+    return departmentMailSettingsStore.saveSettings(settings)
+  })
+
+  ipcMain.handle('get-department-mail-has-password', async () => {
+    const room = requireChief(requireOpenRoom())
+    return settingsStore.hasDepartmentMailPassword(room.path)
+  })
+
+  ipcMain.handle('set-department-mail-password', async (_e, password: string | null) => {
+    const room = requireChief(requireOpenRoom())
+    await settingsStore.setDepartmentMailPassword(room.path, password)
+  })
+
+  ipcMain.handle(
+    'test-department-mail-connection',
+    async (_e, input: DepartmentMailConnectionInput) => {
+      const room = requireChief(requireOpenRoom())
+      const password =
+        input.password.trim() ||
+        (await settingsStore.getDepartmentMailPassword(room.path)) ||
+        ''
+      return testImapConnection({ ...input, password })
+    }
+  )
+
+  async function resolveDepartmentMailConnection(
+    room: Room,
+    passwordOverride = ''
+  ): Promise<DepartmentMailConnectionInput> {
+    if (!departmentMailSettingsStore) throw new Error('Комната не открыта')
+    const settings = await departmentMailSettingsStore.getSettings()
+    const password =
+      passwordOverride.trim() ||
+      (await settingsStore.getDepartmentMailPassword(room.path)) ||
+      ''
+    return {
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure,
+      user: settings.user,
+      password
+    }
+  }
+
+  ipcMain.handle('get-department-mail-inbox', async () => {
+    requireChief(requireOpenRoom())
+    if (!departmentMailInboxStore) throw new Error('Комната не открыта')
+    return departmentMailInboxStore.getInbox()
+  })
+
+  ipcMain.handle(
+    'fetch-department-mail-for-period',
+    async (_e, input: FetchDepartmentMailPeriodInput) => {
+      try {
+        const room = requireChief(requireOpenRoom())
+        if (!departmentMailInboxStore) throw new Error('Комната не открыта')
+        const connection = await resolveDepartmentMailConnection(room)
+        const inbox = await departmentMailInboxStore.getInbox()
+        const known_ids = inbox.messages.map((m) => m.id)
+        const fetched = await fetchMailMessagesForPeriod({
+          connection,
+          date_from: input.date_from,
+          date_to: input.date_to,
+          known_ids
+        })
+        if (fetched.messages.length > 0) {
+          await departmentMailInboxStore.addMessages(fetched.messages)
+        }
+        const nextInbox = await departmentMailInboxStore.getInbox()
+        return {
+          added_count: fetched.messages.length,
+          skipped_known: fetched.skipped_known,
+          total_matched: fetched.total_matched,
+          truncated: fetched.truncated,
+          inbox: nextInbox
+        }
+      } catch (err) {
+        throw new Error(formatMailError(err))
+      }
+    }
+  )
+
+  ipcMain.handle('get-department-mail-message-body', async (_e, messageId: string) => {
+    const room = requireChief(requireOpenRoom())
+    if (!departmentMailInboxStore) throw new Error('Комната не открыта')
+    const inbox = await departmentMailInboxStore.getInbox()
+    const message = inbox.messages.find((m) => m.id === messageId)
+    if (!message) throw new Error('Письмо не найдено')
+    const connection = await resolveDepartmentMailConnection(room)
+    const body = await loadMailMessageBody(connection, message.uid)
+    return { body }
+  })
+
+  ipcMain.handle(
+    'open-department-mail-attachment',
+    async (_e, messageId: string, attachmentIndex: number) => {
+      try {
+        const room = requireChief(requireOpenRoom())
+        if (!departmentMailInboxStore) throw new Error('Комната не открыта')
+        if (!Number.isInteger(attachmentIndex) || attachmentIndex < 0) {
+          throw new Error('Некорректный номер вложения')
+        }
+
+        const inbox = await departmentMailInboxStore.getInbox()
+        const message = inbox.messages.find((m) => m.id === messageId)
+        if (!message) throw new Error('Письмо не найдено')
+        if (message.attachment_count === 0) throw new Error('У письма нет вложений')
+
+        const connection = await resolveDepartmentMailConnection(room)
+        const file = await resolveMailAttachmentForPreview({
+          message,
+          connection,
+          attachmentIndex
+        })
+        await openLocalFilePreview(file.path, file.displayName)
+      } catch (err) {
+        throw new Error(formatMailError(err))
+      }
+    }
+  )
+
+  ipcMain.handle('discard-department-mail-message', async (_e, messageId: string) => {
+    requireChief(requireOpenRoom())
+    if (!departmentMailInboxStore) throw new Error('Комната не открыта')
+    const updated = await departmentMailInboxStore.updateMessage(messageId, {
+      status: 'discarded'
+    })
+    if (!updated) throw new Error('Письмо не найдено')
+    return departmentMailInboxStore.getInbox()
+  })
+
+  ipcMain.handle('prepare-department-mail-task-draft', async (event, messageId: string) => {
+    try {
+      const room = requireChief(requireOpenRoom())
+      if (!departmentMailInboxStore) throw new Error('Комната не открыта')
+      const inbox = await departmentMailInboxStore.getInbox()
+      const message = inbox.messages.find((m) => m.id === messageId)
+      if (!message) throw new Error('Письмо не найдено')
+      if (message.status === 'task_created' && message.task_id) {
+        throw new Error('Из этого письма уже создана задача')
+      }
+
+      const existingTemp = mailDraftTempDirs.get(messageId)
+      if (existingTemp) {
+        await cleanupMailTaskDraftTemp(existingTemp)
+        mailDraftTempDirs.delete(messageId)
+      }
+      await clearMailAttachmentPreviewCache(messageId)
+
+      const connection = await resolveDepartmentMailConnection(room)
+      const sendProgress = (progress: MailTaskDraftProgress) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('department-mail-draft-progress', progress)
+        }
+      }
+
+      const draft = await prepareMailTaskDraft({
+        message,
+        connection,
+        assigneePc: room.state.chief_pc,
+        onProgress: sendProgress
+      })
+      mailDraftTempDirs.set(messageId, draft.temp_dir)
+      return draft
+    } catch (err) {
+      throw new Error(formatMailError(err))
+    }
+  })
+
+  ipcMain.handle('cancel-department-mail-task-draft', async (_e, messageId: string) => {
+    requireChief(requireOpenRoom())
+    const tempDir = mailDraftTempDirs.get(messageId)
+    if (tempDir) {
+      await cleanupMailTaskDraftTemp(tempDir)
+      mailDraftTempDirs.delete(messageId)
+    }
+  })
+
+  ipcMain.handle(
+    'mark-department-mail-message-task-created',
+    async (_e, messageId: string, taskId: string) => {
+      requireChief(requireOpenRoom())
+      if (!departmentMailInboxStore) throw new Error('Комната не открыта')
+      const tempDir = mailDraftTempDirs.get(messageId)
+      if (tempDir) {
+        await cleanupMailTaskDraftTemp(tempDir)
+        mailDraftTempDirs.delete(messageId)
+      }
+      await departmentMailInboxStore.updateMessage(messageId, {
+        status: 'task_created',
+        task_id: taskId
+      })
+      return departmentMailInboxStore.getInbox()
+    }
+  )
+
   ipcMain.handle('subscribe-task-templates', (event) => {
     if (!taskTemplatesStore) return
     setWindowSubscription(event.sender, 'task-templates', () => {
@@ -637,6 +877,13 @@ export function registerHandlers(
       void notesStore!.getNotes().then(listener)
       return unsubscribe
     })
+  })
+
+  ipcMain.handle('open-file-external', async (_e, filePath: string) => {
+    if (typeof filePath !== 'string' || !filePath.trim()) {
+      throw new Error('Некорректный путь к файлу')
+    }
+    await shell.openPath(filePath)
   })
 
   ipcMain.handle(
@@ -748,6 +995,9 @@ export async function closeRoomFully(roomManager: RoomManager): Promise<void> {
   taskTemplatesStore = null
   taskHistoryStore = null
   reminderSettingsStore = null
+  departmentMailSettingsStore = null
+  departmentMailInboxStore = null
+  await clearMailAttachmentPreviewCache()
   reminderScheduler?.stop()
   reminderScheduler = null
   await exchangeStore?.stop()

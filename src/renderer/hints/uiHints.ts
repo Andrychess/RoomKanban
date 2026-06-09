@@ -15,6 +15,8 @@ export const HINT_SHORT: Record<HintTopicKey, string> = {
   'tabs.dashboard':
     'Сводка комнаты: поток по этапам, просрочка, нагрузка по сотрудникам, «зависшие» задачи.',
   'tabs.overdue': 'Список просроченных активных задач (не в колонке «Готово»).',
+  'tabs.departmentMail':
+    'Подключение общего ящика отдела по IMAP и проверка доступа (только начальник).',
   'roomBar.sync':
     'Перечитать JSON-файлы в общей папке комнаты, если правки делали вручную или с другого ПК.',
   'roomBar.leave': 'Закрыть комнату и вернуться к выбору или созданию другой папки.',
@@ -71,7 +73,8 @@ export const UI_HINTS = {
     exchange: HINT_SHORT['tabs.exchange'],
     archive: HINT_SHORT['tabs.archive'],
     dashboard: HINT_SHORT['tabs.dashboard'],
-    overdue: HINT_SHORT['tabs.overdue']
+    overdue: HINT_SHORT['tabs.overdue'],
+    departmentMail: HINT_SHORT['tabs.departmentMail']
   },
   roomBar: {
     sync: HINT_SHORT['roomBar.sync'],

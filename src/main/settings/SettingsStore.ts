@@ -157,4 +157,30 @@ export class SettingsStore {
     s.reminderSent[normalized][key] = Math.floor(Date.now() / 1000)
     await this.save()
   }
+
+  async hasDepartmentMailPassword(roomPath: string): Promise<boolean> {
+    const s = await this.load()
+    const normalized = path.normalize(roomPath)
+    const password = s.departmentMailPasswords?.[normalized]
+    return typeof password === 'string' && password.length > 0
+  }
+
+  async getDepartmentMailPassword(roomPath: string): Promise<string | null> {
+    const s = await this.load()
+    const normalized = path.normalize(roomPath)
+    const password = s.departmentMailPasswords?.[normalized]
+    return typeof password === 'string' && password.length > 0 ? password : null
+  }
+
+  async setDepartmentMailPassword(roomPath: string, password: string | null): Promise<void> {
+    const s = await this.load()
+    const normalized = path.normalize(roomPath)
+    if (!s.departmentMailPasswords) s.departmentMailPasswords = {}
+    if (password?.trim()) {
+      s.departmentMailPasswords[normalized] = password
+    } else {
+      delete s.departmentMailPasswords[normalized]
+    }
+    await this.save()
+  }
 }

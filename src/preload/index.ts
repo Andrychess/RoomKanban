@@ -22,6 +22,17 @@ import type { TaskStatus } from '../shared/taskStatus'
 import type { DocumentationBundle } from '../shared/documentation'
 import type { RoomSyncEvent, UpdateTaskResult } from '../shared/syncEvents'
 import type { AppUpdateStatus } from '../shared/appUpdate'
+import type {
+  DepartmentMailConnectionInput,
+  DepartmentMailInboxData,
+  DepartmentMailMessageBody,
+  DepartmentMailSettings,
+  FetchDepartmentMailPeriodInput,
+  FetchDepartmentMailPeriodResult,
+  MailConnectionTestResult,
+  MailTaskDraftProgress,
+  MailTaskDraftResult
+} from '../shared/departmentMail'
 
 export interface RoomKanbanApi {
   getUserDocumentation: () => Promise<DocumentationBundle>
@@ -88,6 +99,29 @@ export interface RoomKanbanApi {
   subscribeRoomNotes: (callback: (notes: RoomNote[]) => void) => () => void
   getReminderSettings: () => Promise<ReminderSettings>
   saveReminderSettings: (settings: ReminderSettings) => Promise<ReminderSettings>
+  getDepartmentMailSettings: () => Promise<DepartmentMailSettings>
+  saveDepartmentMailSettings: (settings: DepartmentMailSettings) => Promise<DepartmentMailSettings>
+  getDepartmentMailHasPassword: () => Promise<boolean>
+  setDepartmentMailPassword: (password: string | null) => Promise<void>
+  testDepartmentMailConnection: (
+    input: DepartmentMailConnectionInput
+  ) => Promise<MailConnectionTestResult>
+  getDepartmentMailInbox: () => Promise<DepartmentMailInboxData>
+  fetchDepartmentMailForPeriod: (
+    input: FetchDepartmentMailPeriodInput
+  ) => Promise<FetchDepartmentMailPeriodResult>
+  getDepartmentMailMessageBody: (messageId: string) => Promise<DepartmentMailMessageBody>
+  openDepartmentMailAttachment: (messageId: string, attachmentIndex: number) => Promise<void>
+  discardDepartmentMailMessage: (messageId: string) => Promise<DepartmentMailInboxData>
+  prepareDepartmentMailTaskDraft: (messageId: string) => Promise<MailTaskDraftResult>
+  cancelDepartmentMailTaskDraft: (messageId: string) => Promise<void>
+  markDepartmentMailMessageTaskCreated: (
+    messageId: string,
+    taskId: string
+  ) => Promise<DepartmentMailInboxData>
+  subscribeDepartmentMailDraftProgress: (
+    callback: (progress: MailTaskDraftProgress) => void
+  ) => () => void
   getOverdueTasks: () => Promise<Task[]>
   acquireTaskLock: (taskId: string) => Promise<TaskLockResult>
   releaseTaskLock: (taskId: string) => Promise<void>
@@ -196,6 +230,34 @@ const api: RoomKanbanApi = {
   },
   getReminderSettings: () => ipcRenderer.invoke('get-reminder-settings'),
   saveReminderSettings: (settings) => ipcRenderer.invoke('save-reminder-settings', settings),
+  getDepartmentMailSettings: () => ipcRenderer.invoke('get-department-mail-settings'),
+  saveDepartmentMailSettings: (settings) =>
+    ipcRenderer.invoke('save-department-mail-settings', settings),
+  getDepartmentMailHasPassword: () => ipcRenderer.invoke('get-department-mail-has-password'),
+  setDepartmentMailPassword: (password) =>
+    ipcRenderer.invoke('set-department-mail-password', password),
+  testDepartmentMailConnection: (input) =>
+    ipcRenderer.invoke('test-department-mail-connection', input),
+  getDepartmentMailInbox: () => ipcRenderer.invoke('get-department-mail-inbox'),
+  fetchDepartmentMailForPeriod: (input) =>
+    ipcRenderer.invoke('fetch-department-mail-for-period', input),
+  getDepartmentMailMessageBody: (messageId) =>
+    ipcRenderer.invoke('get-department-mail-message-body', messageId),
+  openDepartmentMailAttachment: (messageId, attachmentIndex) =>
+    ipcRenderer.invoke('open-department-mail-attachment', messageId, attachmentIndex),
+  discardDepartmentMailMessage: (messageId) =>
+    ipcRenderer.invoke('discard-department-mail-message', messageId),
+  prepareDepartmentMailTaskDraft: (messageId) =>
+    ipcRenderer.invoke('prepare-department-mail-task-draft', messageId),
+  cancelDepartmentMailTaskDraft: (messageId) =>
+    ipcRenderer.invoke('cancel-department-mail-task-draft', messageId),
+  markDepartmentMailMessageTaskCreated: (messageId, taskId) =>
+    ipcRenderer.invoke('mark-department-mail-message-task-created', messageId, taskId),
+  subscribeDepartmentMailDraftProgress: (callback) => {
+    const handler = (_: unknown, progress: MailTaskDraftProgress) => callback(progress)
+    ipcRenderer.on('department-mail-draft-progress', handler)
+    return () => ipcRenderer.removeListener('department-mail-draft-progress', handler)
+  },
   getOverdueTasks: () => ipcRenderer.invoke('get-overdue-tasks'),
   acquireTaskLock: (taskId) => ipcRenderer.invoke('acquire-task-lock', taskId),
   releaseTaskLock: (taskId) => ipcRenderer.invoke('release-task-lock', taskId),

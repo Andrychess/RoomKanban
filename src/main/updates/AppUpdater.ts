@@ -3,25 +3,95 @@ import { autoUpdater } from 'electron-updater'
 import type { AppUpdateStatus } from '../../shared/appUpdate'
 import { createInitialAppUpdateStatus } from '../../shared/appUpdate'
 
-function humanizeUpdateError(err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err)
+const NETWORK_ERROR_CODES = new Set([
+  'ENOTFOUND',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ENETUNREACH',
+  'EAI_AGAIN',
+  'ERR_INTERNET_DISCONNECTED'
+])
+
+function errorCode(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code: unknown }).code
+    if (typeof code === 'string') return code
+  }
+  return undefined
+}
+
+function httpStatus(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'statusCode' in err) {
+    const status = (err as { statusCode: unknown }).statusCode
+    if (typeof status === 'number') return status
+  }
+  return undefined
+}
+
+/** Без stack trace: в нём часто есть `net.js`, из-за чего ложно срабатывает проверка сети. */
+function primaryErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const stackStart = raw.indexOf('\n    at ')
+  return (stackStart >= 0 ? raw.slice(0, stackStart) : raw).trim()
+}
+
+function isUnpublishedUpdateError(err: unknown, message: string): boolean {
+  const code = errorCode(err)
+  const status = httpStatus(err)
   const lower = message.toLowerCase()
 
-  if (lower.includes('net') || lower.includes('enotfound') || lower.includes('network')) {
-    return 'Нет подключения к интернету. Проверьте сеть и попробуйте снова.'
-  }
-  if (
+  return (
+    code === 'ERR_UPDATER_NO_PUBLISHED_VERSIONS' ||
+    code === 'ERR_UPDATER_LATEST_VERSION_NOT_FOUND' ||
+    code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' ||
+    status === 404 ||
+    lower.includes('no published versions') ||
     lower.includes('404') ||
     lower.includes('not found') ||
     lower.includes('latest.yml') ||
     lower.includes('cannot find') ||
     lower.includes('no published') ||
-    lower.includes('releases/download')
-  ) {
+    lower.includes('releases/download') ||
+    lower.includes('production release')
+  )
+}
+
+function isNetworkUpdateError(err: unknown, message: string): boolean {
+  const code = errorCode(err)
+  const lower = message.toLowerCase()
+
+  if (code && NETWORK_ERROR_CODES.has(code)) return true
+
+  return (
+    lower.includes('enotfound') ||
+    lower.includes('econnrefused') ||
+    lower.includes('etimedout') ||
+    lower.includes('econnreset') ||
+    lower.includes('enetunreach') ||
+    lower.includes('network error') ||
+    lower.includes('network request failed') ||
+    /net::err_[a-z_]+/.test(lower)
+  )
+}
+
+function humanizeUpdateError(err: unknown): string {
+  const message = primaryErrorMessage(err)
+  const lower = message.toLowerCase()
+
+  if (isUnpublishedUpdateError(err, message)) {
     return 'Обновления ещё не опубликованы на GitHub. Попросите IT выполнить первую публикацию релиза (npm run dist:publish или git tag vX.Y.Z).'
   }
-  if (lower.includes('401') || lower.includes('403')) {
+  if (
+    httpStatus(err) === 401 ||
+    httpStatus(err) === 403 ||
+    lower.includes('401') ||
+    lower.includes('403')
+  ) {
     return 'Не удалось получить доступ к серверу обновлений. Репозиторий может быть приватным — нужна настройка доступа.'
+  }
+  if (isNetworkUpdateError(err, message)) {
+    return 'Нет подключения к интернету. Проверьте сеть и попробуйте снова.'
   }
 
   return 'Не удалось проверить обновления. Обратитесь к IT-администратору.'
@@ -97,6 +167,9 @@ export class AppUpdater {
       this.userInitiatedFlow = false
       const raw = err instanceof Error ? err.message : String(err)
       console.error('[app-update]', raw)
+      if (err instanceof Error && err.stack) {
+        console.error('[app-update] stack', err.stack)
+      }
       this.patchStatus({
         phase: 'error',
         progress: undefined,

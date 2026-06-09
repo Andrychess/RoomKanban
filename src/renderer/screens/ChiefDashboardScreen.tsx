@@ -12,10 +12,16 @@ import { useTaskTypes } from '../hooks/useTaskTypes'
 interface Props {
   room: Room
   onOpenOverdue: () => void
+  onOpenMail: () => void
   onTasksChanged: () => void
 }
 
-export default function ChiefDashboardScreen({ room, onOpenOverdue, onTasksChanged }: Props) {
+export default function ChiefDashboardScreen({
+  room,
+  onOpenOverdue,
+  onOpenMail,
+  onTasksChanged
+}: Props) {
   const { types: taskTypes } = useTaskTypes()
   const [data, setData] = useState<ChiefDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,6 +99,12 @@ export default function ChiefDashboardScreen({ room, onOpenOverdue, onTasksChang
                 <HintIcon topic="dashboard.stuck" />
               </span>
             </div>
+            <button type="button" className="dashboard-card dashboard-card-action" onClick={onOpenMail}>
+              <span className="dashboard-card-value" aria-hidden="true">
+                @
+              </span>
+              <span className="dashboard-card-label">Почта отдела</span>
+            </button>
           </div>
 
           <section className="dashboard-section">

@@ -276,6 +276,8 @@ export interface AppSettings {
   kanbanColumnCollapsed?: Record<string, Partial<Record<TaskStatus, boolean>>>
   /** Отправленные напоминания: roomPath → taskId:dueDate:kind → timestamp */
   reminderSent?: Record<string, Record<string, number>>
+  /** Пароли ящика отдела (только на этом ПК): roomPath → password */
+  departmentMailPasswords?: Record<string, string>
   /** @deprecated миграция со старых версий */
   pcId?: string
 }

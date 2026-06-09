@@ -15,6 +15,7 @@ type RoomTabId =
   | 'archive'
   | 'dashboard'
   | 'overdue'
+  | 'departmentMail'
 
 interface Props {
   active: RoomTabId
@@ -44,7 +45,8 @@ const MANAGEMENT_TABS: {
   { id: 'team', label: 'Сотрудники', screen: 'team' },
   { id: 'exchange', label: 'Обмен', screen: 'exchange' },
   { id: 'archive', label: 'Архив', screen: 'archive' },
-  { id: 'overdue', label: 'Просрочено', screen: 'overdue', chiefOnly: true }
+  { id: 'overdue', label: 'Просрочено', screen: 'overdue', chiefOnly: true },
+  { id: 'departmentMail', label: 'Почта отдела', screen: 'departmentMail', chiefOnly: true }
 ]
 
 const MANAGEMENT_TAB_IDS = new Set<RoomTabId>(MANAGEMENT_TABS.map((tab) => tab.id))

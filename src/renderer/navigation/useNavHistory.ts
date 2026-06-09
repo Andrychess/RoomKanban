@@ -15,6 +15,7 @@ export type Screen =
   | 'dashboard'
   | 'archive'
   | 'exchange'
+  | 'departmentMail'
 
 export const SCREEN_LABELS: Record<Screen, string> = {
   welcome: 'Главная',
@@ -30,7 +31,8 @@ export const SCREEN_LABELS: Record<Screen, string> = {
   overdue: 'Просрочено',
   dashboard: 'Сводка',
   archive: 'Архив',
-  exchange: 'Обмен'
+  exchange: 'Обмен',
+  departmentMail: 'Почта отдела'
 }
 
 interface NavEntry {

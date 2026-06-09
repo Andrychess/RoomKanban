@@ -1,6 +1,5 @@
 import fs from 'fs/promises'
 import path from 'path'
-import { shell } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { normalizeDueDateStorage } from '../../shared/dates'
 import { parseTaskStatus } from '../../shared/taskStatus'
@@ -17,6 +16,7 @@ import {
   syncTasksDir
 } from './syncPaths'
 import { assertTaskId, resolvePathInsideRoom } from './syncPathSecurity'
+import { openLocalFilePreview } from '../preview/openLocalFilePreview'
 import type {
   BoardData,
   ChecklistItem,
@@ -807,6 +807,6 @@ export class BoardSyncManager {
     if (!file) throw new Error('Файл не найден')
 
     const full = resolvePathInsideRoom(this.roomPath, file.file_rel)
-    await shell.openPath(full)
+    await openLocalFilePreview(full, file.file_name)
   }
 }

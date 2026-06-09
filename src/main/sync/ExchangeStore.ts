@@ -1,6 +1,5 @@
 import fs from 'fs/promises'
 import path from 'path'
-import { shell } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
 import type { TaskFile } from '../../shared/types'
 import { AsyncMutex } from './AsyncMutex'
@@ -12,6 +11,7 @@ import {
   syncExchangeFilePath
 } from './syncPaths'
 import { assertEmployeeKey, resolvePathInsideRoom } from './syncPathSecurity'
+import { openLocalFilePreview } from '../preview/openLocalFilePreview'
 
 type ExchangeListener = (data: Record<string, TaskFile[]>) => void
 
@@ -342,6 +342,6 @@ export class ExchangeStore {
     const file = list.find((f) => f.id === fileId)
     if (!file) throw new Error('Файл не найден')
     const full = resolvePathInsideRoom(this.roomPath, file.file_rel)
-    await shell.openPath(full)
+    await openLocalFilePreview(full, file.file_name)
   }
 }

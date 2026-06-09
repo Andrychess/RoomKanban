@@ -10,7 +10,7 @@ import { STATUS_LABELS_FULL, TASK_STATUSES } from '../../shared/taskStatus'
 import { DEFAULT_PRIORITY_ID } from '../../shared/defaultTaskPriorities'
 import { DEFAULT_TYPE_ID } from '../../shared/defaultTaskTypes'
 import TaskDetailView from './TaskDetailView'
-import TaskFileGroupEditor, { type PendingFile } from './TaskFileGroupEditor'
+import TaskFileGroupEditor, { type AttachmentLoadProgress, type PendingFile } from './TaskFileGroupEditor'
 import TaskHistoryDialog from './TaskHistoryDialog'
 import { mergeDueDateTime, splitDueDateTime } from '../utils/dates'
 import TaskConflictDialog from './TaskConflictDialog'
@@ -33,9 +33,14 @@ interface Props {
   defaultDueDate?: string | null
   defaultAssigneePc?: string
   defaultTypeId?: string
+  defaultTitle?: string
+  defaultDescription?: string
+  initialPendingSource?: PendingFile[]
+  attachmentLoadProgress?: AttachmentLoadProgress | null
   readOnlyArchived?: boolean
   onClose: () => void
   onSaved: () => void
+  onCreated?: (task: Task) => void | Promise<void>
 }
 
 function pathsToPending(paths: string[]): PendingFile[] {
@@ -55,9 +60,14 @@ export default function TaskEditor({
   defaultDueDate = null,
   defaultAssigneePc,
   defaultTypeId,
+  defaultTitle,
+  defaultDescription,
+  initialPendingSource,
+  attachmentLoadProgress = null,
   readOnlyArchived = false,
   onClose,
-  onSaved
+  onSaved,
+  onCreated
 }: Props) {
   const [mode, setMode] = useState<TaskEditorMode>(() => modeProp ?? (task ? 'edit' : 'create'))
   const isCreate = mode === 'create'
@@ -66,8 +76,8 @@ export default function TaskEditor({
   const employees = roomState.employees
   const pcIds = Object.keys(employees)
 
-  const [title, setTitle] = useState(task?.title ?? '')
-  const [description, setDescription] = useState(task?.description ?? '')
+  const [title, setTitle] = useState(task?.title ?? defaultTitle ?? '')
+  const [description, setDescription] = useState(task?.description ?? defaultDescription ?? '')
   const [assigneePc, setAssigneePc] = useState(
     task?.assignee_pc ?? defaultAssigneePc ?? currentPcId
   )
@@ -80,7 +90,7 @@ export default function TaskEditor({
   const [dueTimePart, setDueTimePart] = useState(initialDue.time)
   const [liveTask, setLiveTask] = useState<Task | null>(task)
 
-  const [pendingSource, setPendingSource] = useState<PendingFile[]>([])
+  const [pendingSource, setPendingSource] = useState<PendingFile[]>(initialPendingSource ?? [])
   const [pendingCompleted, setPendingCompleted] = useState<PendingFile[]>([])
   const [removedSourceIds, setRemovedSourceIds] = useState<string[]>([])
   const [removedCompletedIds, setRemovedCompletedIds] = useState<string[]>([])
@@ -98,6 +108,24 @@ export default function TaskEditor({
   useEffect(() => {
     setMode(modeProp ?? (task ? 'edit' : 'create'))
   }, [modeProp, task?.id])
+
+  useEffect(() => {
+    if (initialPendingSource) {
+      setPendingSource(initialPendingSource)
+    }
+  }, [initialPendingSource])
+
+  useEffect(() => {
+    if (!task && defaultTitle !== undefined) {
+      setTitle(defaultTitle)
+    }
+  }, [task, defaultTitle])
+
+  useEffect(() => {
+    if (!task && defaultDescription !== undefined) {
+      setDescription(defaultDescription)
+    }
+  }, [task, defaultDescription])
 
   useEffect(() => {
     setLiveTask(task)
@@ -265,6 +293,10 @@ export default function TaskEditor({
       setError('Выберите вид задачи')
       return
     }
+    if (attachmentLoadProgress) {
+      setError('Дождитесь загрузки вложений из письма')
+      return
+    }
 
     setLoading(true)
     setError('')
@@ -284,10 +316,13 @@ export default function TaskEditor({
           add_source_files: pendingSource.map((f) => f.path),
           add_completed_files: pendingCompleted.map((f) => f.path)
         }
-        await window.api.createTask(input)
+        const created = await window.api.createTask(input)
+        if (onCreated) {
+          await onCreated(created)
+        }
+        onSaved()
+        onClose()
       }
-      onSaved()
-      onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения')
     } finally {
@@ -296,7 +331,7 @@ export default function TaskEditor({
   }
 
   const fieldsReadOnly = Boolean(readOnlyArchived || isView || (isEdit && lockBlockedBy))
-  const formDisabled = fieldsReadOnly || !lockReady || loading
+  const formDisabled = fieldsReadOnly || !lockReady || loading || Boolean(attachmentLoadProgress)
   const detailTask = liveTask ?? task
   const hasPendingFiles =
     pendingSource.length > 0 ||
@@ -606,8 +641,9 @@ export default function TaskEditor({
                       pending={pendingSource}
                       removedIds={removedSourceIds}
                       taskId={task?.id}
-                      disableAdd={readOnlyArchived}
+                      disableAdd={readOnlyArchived || Boolean(attachmentLoadProgress)}
                       disableRemoveExisting={readOnlyArchived}
+                      loadingAttachments={attachmentLoadProgress}
                       onAdd={() => void pickFiles('source')}
                       onRemoveExisting={(id) => setRemovedSourceIds((prev) => [...prev, id])}
                       onRemovePending={(path) =>
