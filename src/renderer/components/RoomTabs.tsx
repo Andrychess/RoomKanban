@@ -26,9 +26,10 @@ interface Props {
   onSeedTestTasks?: () => void
 }
 
-const PRIMARY_TABS: { id: RoomTabId; label: string; screen: Screen }[] = [
+const PRIMARY_TABS: { id: RoomTabId; label: string; screen: Screen; chiefOnly?: boolean }[] = [
   { id: 'myTasks', label: 'Мои задачи', screen: 'myTasks' },
-  { id: 'myCalendar', label: 'Мой календарь', screen: 'myCalendar' }
+  { id: 'myCalendar', label: 'Мой календарь', screen: 'myCalendar' },
+  { id: 'dashboard', label: 'Сводка комнаты', screen: 'dashboard', chiefOnly: true }
 ]
 
 const MANAGEMENT_TABS: {
@@ -43,7 +44,6 @@ const MANAGEMENT_TABS: {
   { id: 'team', label: 'Сотрудники', screen: 'team' },
   { id: 'exchange', label: 'Обмен', screen: 'exchange' },
   { id: 'archive', label: 'Архив', screen: 'archive' },
-  { id: 'dashboard', label: 'Сводка', screen: 'dashboard', chiefOnly: true },
   { id: 'overdue', label: 'Просрочено', screen: 'overdue', chiefOnly: true }
 ]
 
@@ -70,6 +70,7 @@ export default function RoomTabs({
   const menuRef = useRef<HTMLDivElement>(null)
   const managementActive = MANAGEMENT_TAB_IDS.has(active)
 
+  const primaryTabs = PRIMARY_TABS.filter((tab) => !tab.chiefOnly || isChief)
   const managementTabs = MANAGEMENT_TABS.filter((tab) => !tab.chiefOnly || isChief)
 
   useEffect(() => {
@@ -118,17 +119,19 @@ export default function RoomTabs({
 
   return (
     <nav className="room-tabs" aria-label="Разделы">
-      {PRIMARY_TABS.map((tab) => (
-        <TooltipWrap key={tab.id} text={UI_HINTS.tabs[tab.id]}>
-          <button
-            type="button"
-            className={`room-tab ${active === tab.id ? 'active' : ''}`}
-            onClick={() => onChange(tab.screen)}
-          >
-            {tab.label}
-          </button>
-        </TooltipWrap>
-      ))}
+      <div className="room-tabs-primary">
+        {primaryTabs.map((tab) => (
+          <TooltipWrap key={tab.id} text={UI_HINTS.tabs[tab.id]}>
+            <button
+              type="button"
+              className={`room-tab room-tab-primary ${active === tab.id ? 'active' : ''}`}
+              onClick={() => onChange(tab.screen)}
+            >
+              {tab.label}
+            </button>
+          </TooltipWrap>
+        ))}
+      </div>
 
       <div className="room-tabs-management" ref={menuRef}>
         <TooltipWrap text="Все задачи комнаты, сотрудники, архив, заметки и настройки">

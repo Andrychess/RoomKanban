@@ -1,19 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type DragEvent } from 'react'
 import type { Room, Task, TaskFileKind } from '../../shared/types'
 import {
-  buildEmployeeBoardColumns,
   employeeColumnTheme,
+  splitEmployeeBoardColumns,
   taskBelongsToEmployeeColumn,
-  UNASSIGNED_EMPLOYEE_COLUMN_ID
+  type EmployeeBoardColumn
 } from '../../shared/employeeBoardColumns'
-import KanbanFilters from '../components/KanbanFilters'
+import ColumnScrollFrame from '../components/ColumnScrollFrame'
+import EmployeePanelCard from '../components/EmployeePanelCard'
+import EmployeeTasksDialog from '../components/EmployeeTasksDialog'
 import TooltipWrap from '../components/TooltipWrap'
 import { UI_HINTS } from '../hints/uiHints'
-import { useCollapsedTaskCards } from '../hooks/useCollapsedTaskCards'
 import { useBoardColumnCollapse } from '../hooks/useBoardColumnCollapse'
+import { useCollapsedTaskCards } from '../hooks/useCollapsedTaskCards'
+import { useKanbanBoardMetrics } from '../hooks/useKanbanBoardMetrics'
 import TaskCard from '../components/TaskCard'
 import TaskEditor, { type TaskEditorMode } from '../components/TaskEditor'
-import { useKanbanTaskFilters } from '../hooks/useKanbanTaskFilters'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
 interface Props {
@@ -23,7 +25,7 @@ interface Props {
   tasksLoadError?: string | null
 }
 
-const EMPLOYEE_COLUMN_COLLAPSE_KEY = 'roomKanban:employeeKanbanColumnCollapsed'
+const SELF_COLUMN_COLLAPSE_KEY = 'roomKanban:employeeSelfColumnCollapsed'
 
 export default function EmployeeKanbanScreen({
   room,
@@ -32,24 +34,37 @@ export default function EmployeeKanbanScreen({
   tasksLoadError = null
 }: Props) {
   const { types: taskTypes } = useTaskTypes()
-  const { filters, setFilters, filteredTasks, hasActiveFilters, resetFilters } =
-    useKanbanTaskFilters(tasks, room.pcId, room.state.employees)
-  const { collapsed, toggleColumnCollapsed, expandColumn } = useBoardColumnCollapse(
+  const { collapsed, toggleColumnCollapsed } = useBoardColumnCollapse(
     room.path,
-    EMPLOYEE_COLUMN_COLLAPSE_KEY
+    SELF_COLUMN_COLLAPSE_KEY
   )
   const { isTaskCollapsed, toggleTaskCollapsed } = useCollapsedTaskCards(room.path)
-
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<TaskEditorMode>('create')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [defaultStatus, setDefaultStatus] = useState<Task['status']>('review')
   const [defaultAssigneePc, setDefaultAssigneePc] = useState<string | undefined>(undefined)
-  const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [dialogEmployee, setDialogEmployee] = useState<EmployeeBoardColumn | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null)
 
-  const columns = useMemo(
-    () => buildEmployeeBoardColumns(room.state.employees, tasks),
-    [room.state.employees, tasks]
+  const { self, others } = useMemo(
+    () => splitEmployeeBoardColumns(room.state.employees, tasks, room.pcId),
+    [room.state.employees, tasks, room.pcId]
+  )
+  const screenRef = useRef<HTMLDivElement>(null)
+  const { style: boardStyle } = useKanbanBoardMetrics(screenRef, {
+    columnCount: 1,
+    matrixItemCount: others.length
+  })
+
+  const selfTheme = employeeColumnTheme(0)
+  const selfCollapsed = self ? Boolean(collapsed[self.id]) : false
+  const selfTasks = useMemo(
+    () =>
+      self
+        ? tasks.filter((task) => taskBelongsToEmployeeColumn(task, self.id, room.state.employees))
+        : [],
+    [tasks, self, room.state.employees]
   )
 
   function openCreate(assigneePc: string) {
@@ -86,23 +101,6 @@ export default function EmployeeKanbanScreen({
     }
   }
 
-  async function changeAssignee(assigneePc: string, taskId: string) {
-    const task = tasks.find((t) => t.id === taskId)
-    if (!task || task.assignee_pc === assigneePc) return
-    try {
-      await window.api.updateTaskAssignee(taskId, assigneePc)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Не удалось сменить ответственного')
-    }
-  }
-
-  function handleDragOverColumn(e: React.DragEvent, columnId: string) {
-    if (columnId === UNASSIGNED_EMPLOYEE_COLUMN_ID) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDropTarget(columnId)
-  }
-
   async function openFile(taskId: string, kind: TaskFileKind, fileId: string) {
     try {
       await window.api.openTaskFile(taskId, kind, fileId)
@@ -111,150 +109,161 @@ export default function EmployeeKanbanScreen({
     }
   }
 
+  function handleDragOverEmployee(e: DragEvent, employeeId: string) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTargetId(employeeId)
+  }
+
+  async function assignTaskToEmployee(taskId: string, assigneePc: string) {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task || task.assignee_pc !== room.pcId || assigneePc === room.pcId) return
+
+    try {
+      await window.api.updateTaskAssignee(taskId, assigneePc)
+      if (task.status === 'review') {
+        await window.api.updateTaskStatus(taskId, 'todo')
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось назначить задачу')
+    }
+  }
+
   return (
-    <>
+    <div
+      ref={screenRef}
+      className={`kanban-screen employee-board-screen${boardStyle ? ' kanban-screen--sized' : ''}`}
+      style={boardStyle}
+    >
       {tasksLoadError && <div className="error banner-error">{tasksLoadError}</div>}
-      <div className="kanban-layout">
-        <KanbanFilters
-          filters={filters}
-          employees={room.state.employees}
-          taskTypes={taskTypes}
-          hasActiveFilters={hasActiveFilters}
-          hideOwnershipFilter
-          onChange={setFilters}
-          onReset={resetFilters}
-        />
+      <div className="kanban-layout employee-board-layout" data-board-anchor>
+        {self && (
+          <aside className="employee-board-self">
+            <section
+              className={`kanban-column kanban-column--employee kanban-column--self ${selfCollapsed ? 'is-collapsed' : ''}`}
+              style={
+                {
+                  '--col-accent': selfTheme.accent,
+                  '--col-surface': selfTheme.surface,
+                  '--col-header': selfTheme.header
+                } as React.CSSProperties
+              }
+            >
+              <header className="kanban-column-head">
+                <div className="kanban-column-head-top">
+                  <TooltipWrap
+                    text={
+                      selfCollapsed ? UI_HINTS.kanban.columnExpand : UI_HINTS.kanban.columnCollapse
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="column-collapse-toggle"
+                      onClick={() => toggleColumnCollapsed(self.id)}
+                      aria-expanded={!selfCollapsed}
+                      aria-label={selfCollapsed ? 'Развернуть колонку' : 'Свернуть колонку'}
+                    >
+                      <span className="column-collapse-chevron" aria-hidden="true" />
+                    </button>
+                  </TooltipWrap>
+                  <div className="kanban-column-employee-title">
+                    <span className="employee-self-badge">Вы</span>
+                    <h3>{self.title}</h3>
+                    {self.role ? (
+                      <span className="kanban-column-employee-role">{self.role}</span>
+                    ) : null}
+                  </div>
+                  <span className="column-count">{selfTasks.length}</span>
+                  <TooltipWrap text="Новая задача для вас">
+                    <button
+                      type="button"
+                      className="column-add"
+                      onClick={() => openCreate(self.id)}
+                      aria-label="Добавить задачу"
+                    >
+                      +
+                    </button>
+                  </TooltipWrap>
+                </div>
+              </header>
 
-        <div className="kanban-board-scroll kanban-board-scroll--employees">
-          <div
-            className="kanban-board kanban-board--employees"
-            style={
-              {
-                '--employee-column-count': Math.max(columns.length, 1)
-              } as React.CSSProperties
-            }
-          >
-            {columns.map((col, index) => {
-              const theme = employeeColumnTheme(index)
-              const columnTasks = filteredTasks.filter((task) =>
-                taskBelongsToEmployeeColumn(task, col.id, room.state.employees)
-              )
-              const totalInColumn = tasks.filter((task) =>
-                taskBelongsToEmployeeColumn(task, col.id, room.state.employees)
-              ).length
-              const countLabel =
-                hasActiveFilters && totalInColumn !== columnTasks.length
-                  ? `${columnTasks.length}/${totalInColumn}`
-                  : String(columnTasks.length)
-              const isCollapsed = Boolean(collapsed[col.id])
-              const canDrop = !col.isUnassigned
+              {!selfCollapsed && (
+                <ColumnScrollFrame bodyClassName="kanban-column-body">
+                  {selfTasks.length === 0 && (
+                    <p className="kanban-column-empty">Пока пусто</p>
+                  )}
+                  {selfTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      taskTypes={taskTypes}
+                      assignee={room.state.employees[task.assignee_pc]}
+                      columnAccent={selfTheme.accent}
+                      hideAssignee
+                      isCollapsed={isTaskCollapsed(task.id)}
+                      onToggleCollapse={() => toggleTaskCollapsed(task.id)}
+                      onViewDetails={openViewDetails}
+                      onEdit={openEdit}
+                      onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
+                      onStatusChange={(id, status) => void changeStatus(status, id)}
+                    />
+                  ))}
+                </ColumnScrollFrame>
+              )}
+            </section>
+          </aside>
+        )}
 
+        <div className="employee-board-others-scroll">
+          <div className="employee-board-matrix">
+            {others.map((col, index) => {
+              const theme = employeeColumnTheme(index + 1)
               return (
-                <section
+                <EmployeePanelCard
                   key={col.id}
-                  className={`kanban-column kanban-column--employee ${dropTarget === col.id ? 'is-drop-target' : ''} ${isCollapsed ? 'is-collapsed' : ''}`}
-                  style={
-                    {
-                      '--col-accent': theme.accent,
-                      '--col-surface': theme.surface,
-                      '--col-header': theme.header
-                    } as React.CSSProperties
-                  }
-                  onDragOver={(e) => handleDragOverColumn(e, col.id)}
-                  onDragLeave={() => setDropTarget(null)}
+                  column={col}
+                  tasks={tasks}
+                  employees={room.state.employees}
+                  accent={theme.accent}
+                  surface={theme.surface}
+                  header={theme.header}
+                  isDropTarget={dropTargetId === col.id}
+                  onDragOver={(e) => handleDragOverEmployee(e, col.id)}
+                  onDragLeave={() => setDropTargetId(null)}
                   onDrop={(e) => {
                     e.preventDefault()
-                    setDropTarget(null)
-                    if (!canDrop) return
+                    setDropTargetId(null)
                     const taskId = e.dataTransfer.getData('text/task-id')
-                    if (taskId) {
-                      expandColumn(col.id)
-                      void changeAssignee(col.id, taskId)
-                    }
+                    if (taskId) void assignTaskToEmployee(taskId, col.id)
                   }}
-                >
-                  <header className="kanban-column-head">
-                    <div className="kanban-column-head-top">
-                      <TooltipWrap
-                        text={
-                          isCollapsed
-                            ? UI_HINTS.kanban.columnExpand
-                            : UI_HINTS.kanban.columnCollapse
-                        }
-                      >
-                        <button
-                          type="button"
-                          className="column-collapse-toggle"
-                          onClick={() => toggleColumnCollapsed(col.id)}
-                          aria-expanded={!isCollapsed}
-                          aria-label={isCollapsed ? 'Развернуть колонку' : 'Свернуть колонку'}
-                        >
-                          <span className="column-collapse-chevron" aria-hidden="true" />
-                        </button>
-                      </TooltipWrap>
-                      <div className="kanban-column-employee-title">
-                        <h3>{col.title}</h3>
-                        {col.role ? (
-                          <span className="kanban-column-employee-role">{col.role}</span>
-                        ) : null}
-                      </div>
-                      <TooltipWrap
-                        text={
-                          hasActiveFilters
-                            ? `${UI_HINTS.kanban.columnCount}: ${columnTasks.length} из ${totalInColumn}`
-                            : `${columnTasks.length} в колонке`
-                        }
-                      >
-                        <span className="column-count">{countLabel}</span>
-                      </TooltipWrap>
-                      {canDrop && (
-                        <TooltipWrap text="Новая задача для этого сотрудника">
-                          <button
-                            type="button"
-                            className="column-add"
-                            onClick={() => openCreate(col.id)}
-                            aria-label="Добавить задачу"
-                          >
-                            +
-                          </button>
-                        </TooltipWrap>
-                      )}
-                    </div>
-                  </header>
-
-                  {!isCollapsed && (
-                    <div className="kanban-column-body">
-                      {columnTasks.length === 0 && (
-                        <p className="kanban-column-empty">
-                          {hasActiveFilters && totalInColumn > 0
-                            ? 'Нет задач по фильтру'
-                            : 'Пока пусто'}
-                        </p>
-                      )}
-                      {columnTasks.map((task) => (
-                        <TaskCard
-                          key={task.id}
-                          task={task}
-                          taskTypes={taskTypes}
-                          assignee={room.state.employees[task.assignee_pc]}
-                          columnAccent={theme.accent}
-                          hideAssignee
-                          isCollapsed={isTaskCollapsed(task.id)}
-                          onToggleCollapse={() => toggleTaskCollapsed(task.id)}
-                          onViewDetails={openViewDetails}
-                          onEdit={openEdit}
-                          onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
-                          onStatusChange={(id, status) => void changeStatus(status, id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </section>
+                  onOpenAll={() => setDialogEmployee(col)}
+                />
               )
             })}
+            {others.length === 0 && (
+              <p className="employee-board-others-empty">Других сотрудников в комнате нет</p>
+            )}
           </div>
         </div>
       </div>
+
+      {dialogEmployee && (
+        <EmployeeTasksDialog
+          roomPath={room.path}
+          roomState={room.state}
+          currentPcId={room.pcId}
+          employeeId={dialogEmployee.id}
+          employeeName={dialogEmployee.title}
+          employeeRole={dialogEmployee.role}
+          tasks={tasks}
+          taskTypes={taskTypes}
+          onClose={() => setDialogEmployee(null)}
+          onViewDetails={openViewDetails}
+          onEdit={openEdit}
+          onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
+          onStatusChange={(id, status) => void changeStatus(status, id)}
+        />
+      )}
 
       {editorOpen && (
         <TaskEditor
@@ -269,6 +278,6 @@ export default function EmployeeKanbanScreen({
           onSaved={onTasksChange}
         />
       )}
-    </>
+    </div>
   )
 }

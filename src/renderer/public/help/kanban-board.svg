@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" role="img" aria-label="0=10=-4>A:0">
+  <rect width="720" height="300" rx="12" fill="#121820"/>
+  <g font-family="Segoe UI, sans-serif">
+    <rect x="12" y="12" width="168" height="276" rx="10" fill="#1c2636" stroke="#a78bfa" stroke-width="2"/>
+    <text x="24" y="40" fill="#f0f4f8" font-size="14" font-weight="700">E>4OI85</text>
+    <circle cx="150" cy="32" r="12" fill="#3a4f6a"/><text x="150" y="36" fill="#a78bfa" font-size="11" font-weight="700" text-anchor="middle">3</text>
+    <rect x="24" y="56" width="144" height="52" rx="8" fill="#263348" stroke="#3a4f6a"/>
+    <rect x="24" y="116" width="144" height="52" rx="8" fill="#263348" stroke="#3a4f6a"/>
+    <rect x="24" y="176" width="144" height="52" rx="8" fill="#263348" stroke="#3a4f6a"/>
+
+    <rect x="188" y="12" width="168" height="276" rx="10" fill="#1c2636" stroke="#94a3b8" stroke-width="2"/>
+    <text x="200" y="40" fill="#f0f4f8" font-size="14" font-weight="700"> >G5@548</text>
+    <rect x="200" y="56" width="144" height="52" rx="8" fill="#263348" stroke="#3a4f6a"/>
+
+    <rect x="364" y="12" width="168" height="276" rx="10" fill="#1c2636" stroke="#fbbf24" stroke-width="2"/>
+    <text x="376" y="40" fill="#f0f4f8" font-size="14" font-weight="700"> @01>B5</text>
+    <rect x="376" y="56" width="144" height="52" rx="8" fill="#263348" stroke="#3a4f6a"/>
+    <rect x="376" y="116" width="144" height="52" rx="8" fill="#263348" stroke="#3a4f6a"/>
+
+    <rect x="540" y="12" width="168" height="276" rx="10" fill="#1c2636" stroke="#4ade80" stroke-width="2"/>
+    <text x="552" y="40" fill="#f0f4f8" font-size="14" font-weight="700">>B>2></text>
+    <rect x="552" y="56" width="144" height="40" rx="8" fill="#22c55e" fill-opacity="0.15" stroke="#4ade80"/>
+    <text x="624" y="150" fill="#9eb0c4" font-size="12" text-anchor="middle"> 0@E82</text>
+  </g>
+</svg>

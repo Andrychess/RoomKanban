@@ -14,8 +14,10 @@ interface Props {
   assignee?: Employee
   columnAccent?: string
   hideAssignee?: boolean
-  isCollapsed: boolean
-  onToggleCollapse: () => void
+  /** Карточка всегда развёрнута, без кнопки сворачивания */
+  alwaysExpanded?: boolean
+  isCollapsed?: boolean
+  onToggleCollapse?: () => void
   onViewDetails: (task: Task) => void
   onEdit: (task: Task) => void
   onOpenFile: (taskId: string, kind: TaskFileKind, fileId: string) => void
@@ -139,13 +141,15 @@ export default function TaskCard({
   assignee,
   columnAccent,
   hideAssignee = false,
-  isCollapsed,
+  alwaysExpanded = false,
+  isCollapsed = false,
   onToggleCollapse,
   onViewDetails,
   onEdit,
   onOpenFile,
   onStatusChange
 }: Props) {
+  const collapsed = alwaysExpanded ? false : isCollapsed
   const overdue = isTaskOverdue(task)
   const taskType = findTaskType(taskTypes, task.type_id)
   const accentColor = taskType?.color ?? columnAccent ?? '#64748b'
@@ -166,25 +170,27 @@ export default function TaskCard({
   ) : undefined
 
   function handleToggleAreaClick(e: MouseEvent<HTMLElement>) {
+    if (alwaysExpanded || !onToggleCollapse) return
     if (isInteractiveTarget(e.target)) return
     onToggleCollapse()
   }
 
-  function renderCollapseToggle(className: string, collapsed: boolean) {
+  function renderCollapseToggle(className: string, isCardCollapsed: boolean) {
+    if (alwaysExpanded) return null
     return (
-      <TooltipWrap text={collapsed ? UI_HINTS.taskCard.expand : UI_HINTS.taskCard.collapse}>
+      <TooltipWrap text={isCardCollapsed ? UI_HINTS.taskCard.expand : UI_HINTS.taskCard.collapse}>
         <button
           type="button"
           className={`task-card-collapse-toggle task-card-no-drag ${className}`}
           onClick={(e) => {
             e.stopPropagation()
-            onToggleCollapse()
+            onToggleCollapse?.()
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Развернуть карточку' : 'Свернуть карточку'}
+          aria-expanded={!isCardCollapsed}
+          aria-label={isCardCollapsed ? 'Развернуть карточку' : 'Свернуть карточку'}
         >
-          <CollapseChevron collapsed={collapsed} />
+          <CollapseChevron collapsed={isCardCollapsed} />
         </button>
       </TooltipWrap>
     )
@@ -192,10 +198,10 @@ export default function TaskCard({
 
   function renderFooter() {
     return (
-      <div className={`task-card-footer ${isCollapsed ? 'task-card-footer--compact' : ''}`}>
+      <div className={`task-card-footer ${collapsed ? 'task-card-footer--compact' : ''}`}>
         <TaskStatusCubes
           status={task.status}
-          compact={isCollapsed}
+          compact={collapsed}
           onChange={(next) => {
             if (next !== task.status) onStatusChange(task.id, next)
           }}
@@ -204,10 +210,10 @@ export default function TaskCard({
           <TooltipWrap text={UI_HINTS.taskCard.details}>
             <button
               type="button"
-              className={`task-card-icon-btn task-card-no-drag ${isCollapsed ? 'task-card-icon-btn--text' : ''}`}
+              className={`task-card-icon-btn task-card-no-drag ${collapsed ? 'task-card-icon-btn--text' : ''}`}
               onClick={() => onViewDetails(task)}
             >
-              {isCollapsed ? (
+              {collapsed ? (
                 <>
                   <DetailsIcon />
                   <span>Подробнее</span>
@@ -237,7 +243,7 @@ export default function TaskCard({
 
   return (
     <article
-      className={`task-card ${overdue ? 'is-overdue' : ''} ${isCollapsed ? 'is-collapsed' : 'is-expanded'}`}
+      className={`task-card ${overdue ? 'is-overdue' : ''} ${collapsed ? 'is-collapsed' : 'is-expanded'}`}
       style={
         {
           borderLeftColor: accentColor,
@@ -255,17 +261,18 @@ export default function TaskCard({
         e.dataTransfer.effectAllowed = 'move'
       }}
     >
-      {isCollapsed ? (
+      {collapsed ? (
         <div
           className="task-card-compact"
           onClick={handleToggleAreaClick}
-          role="button"
-          tabIndex={0}
+          role={alwaysExpanded ? undefined : 'button'}
+          tabIndex={alwaysExpanded ? undefined : 0}
           aria-expanded={false}
           onKeyDown={(e) => {
+            if (alwaysExpanded) return
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
-              onToggleCollapse()
+              onToggleCollapse?.()
             }
           }}
         >
@@ -305,14 +312,15 @@ export default function TaskCard({
           <div className="task-card-body">
             <div
               className="task-card-title-row"
-              onClick={handleToggleAreaClick}
-              role="button"
-              tabIndex={0}
+              onClick={alwaysExpanded ? undefined : handleToggleAreaClick}
+              role={alwaysExpanded ? undefined : 'button'}
+              tabIndex={alwaysExpanded ? undefined : 0}
               aria-expanded
               onKeyDown={(e) => {
+                if (alwaysExpanded) return
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  onToggleCollapse()
+                  onToggleCollapse?.()
                 }
               }}
             >

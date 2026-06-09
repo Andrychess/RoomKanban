@@ -1,4 +1,6 @@
 import type { RoomState, Task } from './types'
+import type { TaskStatus } from './taskStatus'
+import { TASK_STATUSES } from './taskStatus'
 import { filterOverdueTasks } from './overdue'
 import { isActiveTask } from './tasks'
 
@@ -17,11 +19,14 @@ export interface StuckTaskSummary {
   days_in_progress: number
 }
 
+export type StatusFunnel = Record<TaskStatus, number>
+
 export interface ChiefDashboardData {
   overdue_count: number
   without_due_count: number
   stuck_tasks: StuckTaskSummary[]
   workload: EmployeeWorkload[]
+  status_funnel: StatusFunnel
 }
 
 export function buildChiefDashboard(tasks: Task[], employees: RoomState['employees']): ChiefDashboardData {
@@ -55,10 +60,16 @@ export function buildChiefDashboard(tasks: Task[], employees: RoomState['employe
 
   workload.sort((a, b) => b.total - a.total)
 
+  const onBoard = tasks.filter((t) => !t.archived_at)
+  const status_funnel = Object.fromEntries(
+    TASK_STATUSES.map((status) => [status, onBoard.filter((t) => t.status === status).length])
+  ) as StatusFunnel
+
   return {
     overdue_count: overdue.length,
     without_due_count,
     stuck_tasks,
-    workload
+    workload,
+    status_funnel
   }
 }

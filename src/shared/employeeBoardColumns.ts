@@ -88,6 +88,25 @@ export function buildEmployeeBoardColumns(
   return columns
 }
 
+export function splitEmployeeBoardColumns(
+  employees: Record<string, Employee>,
+  tasks: Task[],
+  currentPcId: string
+): { self: EmployeeBoardColumn | null; others: EmployeeBoardColumn[] } {
+  const all = buildEmployeeBoardColumns(employees, tasks)
+  const self = all.find((col) => col.id === currentPcId) ?? null
+  const others = all.filter((col) => col.id !== currentPcId)
+  return { self, others }
+}
+
+export function countTasksForEmployee(
+  tasks: Task[],
+  columnId: string,
+  employees: Record<string, Employee>
+): number {
+  return tasks.filter((task) => taskBelongsToEmployeeColumn(task, columnId, employees)).length
+}
+
 export function taskBelongsToEmployeeColumn(
   task: Task,
   columnId: string,

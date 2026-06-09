@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Room, Task, TaskFileKind } from '../../shared/types'
 import { sortTasksInColumn } from '../../shared/columnSort'
 import { COLUMN_THEMES, KANBAN_COLUMNS } from '../../shared/taskStatus'
@@ -8,8 +8,10 @@ import TooltipWrap from '../components/TooltipWrap'
 import { UI_HINTS } from '../hints/uiHints'
 import { useCollapsedTaskCards } from '../hooks/useCollapsedTaskCards'
 import { useKanbanColumnCollapse } from '../hooks/useKanbanColumnCollapse'
+import ColumnScrollFrame from '../components/ColumnScrollFrame'
 import TaskCard from '../components/TaskCard'
 import TaskEditor, { type TaskEditorMode } from '../components/TaskEditor'
+import { useKanbanBoardMetrics } from '../hooks/useKanbanBoardMetrics'
 import { useKanbanTaskFilters } from '../hooks/useKanbanTaskFilters'
 import { useTaskTypes } from '../hooks/useTaskTypes'
 
@@ -38,6 +40,10 @@ export default function KanbanScreen({
     useKanbanTaskFilters(scopedTasks, room.pcId, room.state.employees)
   const { collapsed, toggleColumnCollapsed, expandColumn } = useKanbanColumnCollapse(room.path)
   const { isTaskCollapsed, toggleTaskCollapsed } = useCollapsedTaskCards(room.path)
+  const screenRef = useRef<HTMLDivElement>(null)
+  const { style: boardStyle } = useKanbanBoardMetrics(screenRef, {
+    columnCount: KANBAN_COLUMNS.length
+  })
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<TaskEditorMode>('create')
@@ -111,7 +117,11 @@ export default function KanbanScreen({
   }
 
   return (
-    <>
+    <div
+      ref={screenRef}
+      className={`kanban-screen${boardStyle ? ' kanban-screen--sized' : ''}`}
+      style={boardStyle}
+    >
       {tasksLoadError && <div className="error banner-error">{tasksLoadError}</div>}
       <div className="kanban-layout">
       <KanbanFilters
@@ -124,7 +134,7 @@ export default function KanbanScreen({
         onReset={resetFilters}
       />
 
-      <div className="kanban-board-scroll">
+      <div className="kanban-board-scroll" data-board-anchor>
       <div className="kanban-board">
         {KANBAN_COLUMNS.map((col) => {
           const theme = COLUMN_THEMES[col.id]
@@ -217,31 +227,31 @@ export default function KanbanScreen({
               </header>
 
               {!isCollapsed && (
-              <div className="kanban-column-body">
-                {columnTasks.length === 0 && (
-                  <p className="kanban-column-empty">
-                    {hasActiveFilters && totalInColumn > 0
-                      ? 'Нет задач по фильтру'
-                      : 'Пока пусто'}
-                  </p>
-                )}
-                {columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    taskTypes={taskTypes}
-                    assignee={room.state.employees[task.assignee_pc]}
-                    columnAccent={theme.accent}
-                    hideAssignee={scope === 'mine'}
-                    isCollapsed={isTaskCollapsed(task.id)}
-                    onToggleCollapse={() => toggleTaskCollapsed(task.id)}
-                    onViewDetails={openViewDetails}
-                    onEdit={openEdit}
-                    onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
-                    onStatusChange={(id, status) => void changeStatus(status, id)}
-                  />
-                ))}
-              </div>
+                <ColumnScrollFrame bodyClassName="kanban-column-body">
+                  {columnTasks.length === 0 && (
+                    <p className="kanban-column-empty">
+                      {hasActiveFilters && totalInColumn > 0
+                        ? 'Нет задач по фильтру'
+                        : 'Пока пусто'}
+                    </p>
+                  )}
+                  {columnTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      taskTypes={taskTypes}
+                      assignee={room.state.employees[task.assignee_pc]}
+                      columnAccent={theme.accent}
+                      hideAssignee={scope === 'mine'}
+                      isCollapsed={isTaskCollapsed(task.id)}
+                      onToggleCollapse={() => toggleTaskCollapsed(task.id)}
+                      onViewDetails={openViewDetails}
+                      onEdit={openEdit}
+                      onOpenFile={(id, kind, fileId) => void openFile(id, kind, fileId)}
+                      onStatusChange={(id, status) => void changeStatus(status, id)}
+                    />
+                  ))}
+                </ColumnScrollFrame>
               )}
             </section>
           )
@@ -274,7 +284,6 @@ export default function KanbanScreen({
           onSaved={onTasksChange}
         />
       )}
-
-    </>
+    </div>
   )
 }

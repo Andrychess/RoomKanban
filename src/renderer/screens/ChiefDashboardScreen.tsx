@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import type { ChiefDashboardData } from '../../shared/chiefDashboard'
 import type { Room, Task } from '../../shared/types'
-import { STATUS_LABELS } from '../../shared/taskStatus'
+import { COLUMN_THEMES, KANBAN_COLUMNS, STATUS_LABELS } from '../../shared/taskStatus'
 import ReminderSettingsPanel from '../components/ReminderSettingsPanel'
 import TooltipWrap from '../components/TooltipWrap'
 import HintIcon from '../components/HintIcon'
@@ -37,7 +37,7 @@ export default function ChiefDashboardScreen({ room, onOpenOverdue, onTasksChang
   return (
     <div className="dashboard-page">
       <div className="dashboard-header">
-        <h2>Сводка для начальника</h2>
+        <h2>Сводка комнаты</h2>
         <button type="button" className="btn" disabled={loading} onClick={() => void load()}>
           Обновить
         </button>
@@ -47,6 +47,31 @@ export default function ChiefDashboardScreen({ room, onOpenOverdue, onTasksChang
 
       {data && !loading && (
         <>
+          <section className="dashboard-section dashboard-funnel">
+            <h3>
+              Поток задач по этапам
+              <HintIcon topic="dashboard.funnel" />
+            </h3>
+            <div className="dashboard-funnel-row">
+              {KANBAN_COLUMNS.map((col, index) => {
+                const count = data.status_funnel[col.id]
+                const theme = COLUMN_THEMES[col.id]
+                return (
+                  <div key={col.id} className="dashboard-funnel-stage-wrap">
+                    {index > 0 ? <span className="dashboard-funnel-arrow" aria-hidden="true" /> : null}
+                    <div
+                      className="dashboard-funnel-stage"
+                      style={{ '--stage-accent': theme.accent } as CSSProperties}
+                    >
+                      <span className="dashboard-funnel-stage-value">{count}</span>
+                      <span className="dashboard-funnel-stage-label">{col.title}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
           <div className="dashboard-cards">
             <TooltipWrap text={UI_HINTS.dashboard.overdueCard}>
               <button type="button" className="dashboard-card dashboard-card-alert" onClick={onOpenOverdue}>

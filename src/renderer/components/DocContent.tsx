@@ -1,9 +1,19 @@
 import type { ReactNode } from 'react'
 
+const IMAGE_LINE_RE = /^!\[([^\]]*)\]\(([^)]+)\)$/
+const INLINE_IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)/g
+const INLINE_FORMAT_RE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)|!\[[^\]]*\]\([^)]+\))/g
+
 /** Упрощённый рендер Markdown для справки (без внешних зависимостей). */
 export default function DocContent({ markdown }: { markdown: string }) {
   const blocks = parseBlocks(markdown)
   return <div className="doc-content">{blocks}</div>
+}
+
+function resolveHelpImageSrc(path: string): string {
+  if (/^(https?:|data:|blob:)/.test(path)) return path
+  const clean = path.replace(/^\.\//, '')
+  return clean.startsWith('help/') ? `./${clean}` : `./help/${clean}`
 }
 
 function parseBlocks(text: string): ReactNode[] {
@@ -14,6 +24,12 @@ function parseBlocks(text: string): ReactNode[] {
 
   while (i < lines.length) {
     const line = lines[i]
+    const imageMatch = line.trim().match(IMAGE_LINE_RE)
+    if (imageMatch) {
+      nodes.push(renderImage(imageMatch[1], imageMatch[2], key++))
+      i++
+      continue
+    }
 
     if (line.startsWith('```')) {
       const codeLines: string[] = []
@@ -63,7 +79,13 @@ function parseBlocks(text: string): ReactNode[] {
     }
 
     const para: string[] = []
-    while (i < lines.length && lines[i].trim() && !lines[i].startsWith('|') && !/^[-*]\s+/.test(lines[i])) {
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !lines[i].startsWith('|') &&
+      !/^[-*]\s+/.test(lines[i]) &&
+      !IMAGE_LINE_RE.test(lines[i].trim())
+    ) {
       para.push(lines[i])
       i++
     }
@@ -75,6 +97,15 @@ function parseBlocks(text: string): ReactNode[] {
   }
 
   return nodes
+}
+
+function renderImage(alt: string, src: string, key: number): ReactNode {
+  return (
+    <figure key={key} className="doc-figure">
+      <img src={resolveHelpImageSrc(src)} alt={alt} className="doc-image" loading="lazy" />
+      {alt.trim() ? <figcaption className="doc-figcaption">{alt}</figcaption> : null}
+    </figure>
+  )
 }
 
 function renderTable(lines: string[], key: number): ReactNode {
@@ -112,18 +143,34 @@ function renderTable(lines: string[], key: number): ReactNode {
 
 function inlineFormat(text: string): ReactNode {
   const parts: ReactNode[] = []
-  const re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g
   let last = 0
   let m: RegExpExecArray | null
   let k = 0
 
-  while ((m = re.exec(text)) !== null) {
+  while ((m = INLINE_FORMAT_RE.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index))
     const token = m[0]
     if (token.startsWith('**')) {
       parts.push(<strong key={k++}>{token.slice(2, -2)}</strong>)
     } else if (token.startsWith('`')) {
-      parts.push(<code key={k++} className="doc-code-inline">{token.slice(1, -1)}</code>)
+      parts.push(
+        <code key={k++} className="doc-code-inline">
+          {token.slice(1, -1)}
+        </code>
+      )
+    } else if (token.startsWith('![')) {
+      const img = token.match(INLINE_IMAGE_RE)
+      if (img) {
+        parts.push(
+          <img
+            key={k++}
+            src={resolveHelpImageSrc(img[2])}
+            alt={img[1]}
+            className="doc-image doc-image--inline"
+            loading="lazy"
+          />
+        )
+      }
     } else {
       const link = token.match(/\[([^\]]+)\]\(([^)]+)\)/)
       if (link) {

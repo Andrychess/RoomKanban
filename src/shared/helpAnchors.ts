@@ -86,6 +86,7 @@ export const HINT_DOC_MAP = {
   'exchange.clear': USER_HELP_ANCHORS.exchange,
   'exchange.open': USER_HELP_ANCHORS.exchange,
   'exchange.remove': USER_HELP_ANCHORS.exchange,
+  'dashboard.funnel': USER_HELP_ANCHORS.kanban,
   'dashboard.overdueCard': USER_HELP_ANCHORS.overdue,
   'dashboard.noDue': USER_HELP_ANCHORS.dueDateTime,
   'dashboard.stuck': USER_HELP_ANCHORS.sections,

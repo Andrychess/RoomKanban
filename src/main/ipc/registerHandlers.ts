@@ -538,7 +538,8 @@ export function registerHandlers(
         overdue_count: 0,
         without_due_count: 0,
         stuck_tasks: [],
-        workload: []
+        workload: [],
+        status_funnel: { review: 0, todo: 0, in_progress: 0, done: 0 }
       }
       return empty
     }

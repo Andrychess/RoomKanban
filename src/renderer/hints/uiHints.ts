@@ -12,7 +12,8 @@ export const HINT_SHORT: Record<HintTopicKey, string> = {
   'tabs.team': 'Состав отдела: имена, роли и пароли для входа в комнату.',
   'tabs.exchange': 'Быстрая передача файлов между сотрудниками без привязки к задаче.',
   'tabs.archive': 'Выполненные задачи с доски. Можно вернуть или удалить навсегда.',
-  'tabs.dashboard': 'Сводка для начальника: просрочка, нагрузка, «зависшие» задачи.',
+  'tabs.dashboard':
+    'Сводка комнаты: поток по этапам, просрочка, нагрузка по сотрудникам, «зависшие» задачи.',
   'tabs.overdue': 'Список просроченных активных задач (не в колонке «Готово»).',
   'roomBar.sync':
     'Перечитать JSON-файлы в общей папке комнаты, если правки делали вручную или с другого ПК.',
@@ -48,6 +49,7 @@ export const HINT_SHORT: Record<HintTopicKey, string> = {
   'exchange.clear': 'Удалить все файлы только из этого окна обмена.',
   'exchange.open': 'Открыть файл в программе по умолчанию.',
   'exchange.remove': 'Убрать один файл из окна обмена.',
+  'dashboard.funnel': 'Сколько задач на каждом этапе канбана прямо сейчас.',
   'dashboard.overdueCard': 'Перейти к списку просроченных задач.',
   'dashboard.noDue': 'Активные задачи без указанного срока.',
   'dashboard.stuck': 'В «В работе» без движения дольше недели.',
@@ -120,6 +122,7 @@ export const UI_HINTS = {
     remove: HINT_SHORT['exchange.remove']
   },
   dashboard: {
+    funnel: HINT_SHORT['dashboard.funnel'],
     overdueCard: HINT_SHORT['dashboard.overdueCard'],
     noDue: HINT_SHORT['dashboard.noDue'],
     stuck: HINT_SHORT['dashboard.stuck'],
